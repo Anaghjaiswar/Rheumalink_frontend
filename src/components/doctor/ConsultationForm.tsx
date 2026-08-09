@@ -2,81 +2,12 @@ import React, { useState } from "react"
 import { EntryMode, MedRow } from "../../types/doctor"
 import { LAB_TESTS, FOLLOW_UP_OPTIONS } from "../../data/doctorData"
 import { Label } from "../ui/Label"
+import { Input } from "../ui/Input"
+import { Textarea } from "../ui/Textarea"
 import { PrimaryBtn } from "../ui/Buttons"
 import { MicIcon, TrashIcon, PlusIcon, CalendarIcon } from "../icons"
 import { PrescriptionPreview } from "./PrescriptionPreview"
 import { useSpeechRecognition } from "../../hooks/useSpeechRecognition"
-
-function FInput({ micButton = false, language = "en-IN", value, onChange, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { micButton?: boolean; language?: string }) {
-  const currentValue = typeof value === "string" ? value : ""
-  const handleSpeechUpdate = (newText: string) => {
-    if (onChange) {
-      onChange({ target: { value: newText } } as React.ChangeEvent<HTMLInputElement>)
-    }
-  }
-  const { isListening, toggleListening } = useSpeechRecognition(currentValue, handleSpeechUpdate, language)
-
-  return (
-    <div className="relative flex items-center">
-      <input
-        {...props}
-        value={value}
-        onChange={onChange}
-        className={`w-full px-4 py-3 rounded-xl border-2 bg-slate-50 text-slate-800 text-base font-500 focus:outline-none focus:border-teal-400 focus:bg-white transition-all placeholder:text-slate-400 ${micButton ? "pr-12" : ""} ${
-          isListening ? "border-red-500 bg-red-50/20 animate-pulse" : "border-slate-200"
-        }`}
-      />
-      {micButton && (
-        <button
-          type="button"
-          onClick={toggleListening}
-          title={isListening ? "Listening..." : "Voice to text"}
-          className={`absolute right-3 p-2 rounded-lg transition-colors ${
-            isListening ? "bg-red-500 text-white animate-bounce shadow-md" : "bg-teal-50 text-teal-600 hover:bg-teal-100"
-          }`}
-        >
-          <MicIcon size={15} />
-        </button>
-      )}
-    </div>
-  )
-}
-
-function FTextarea({ micButton = false, language = "en-IN", value, onChange, ...props }: React.TextareaHTMLAttributes<HTMLTextAreaElement> & { micButton?: boolean; language?: string }) {
-  const currentValue = typeof value === "string" ? value : ""
-  const handleSpeechUpdate = (newText: string) => {
-    if (onChange) {
-      onChange({ target: { value: newText } } as React.ChangeEvent<HTMLTextAreaElement>)
-    }
-  }
-  const { isListening, toggleListening } = useSpeechRecognition(currentValue, handleSpeechUpdate, language)
-
-  return (
-    <div className="relative">
-      <textarea
-        {...props}
-        value={value}
-        onChange={onChange}
-        rows={props.rows || 3}
-        className={`w-full px-4 py-3 rounded-xl border-2 bg-slate-50 text-slate-800 text-base font-500 focus:outline-none focus:border-teal-400 focus:bg-white transition-all placeholder:text-slate-400 resize-none ${micButton ? "pr-12" : ""} ${
-          isListening ? "border-red-500 bg-red-50/20 animate-pulse" : "border-slate-200"
-        }`}
-      />
-      {micButton && (
-        <button
-          type="button"
-          onClick={toggleListening}
-          title={isListening ? "Listening..." : "Voice to text"}
-          className={`absolute right-3 bottom-3 p-2 rounded-lg transition-colors ${
-            isListening ? "bg-red-500 text-white animate-bounce shadow-md" : "bg-teal-50 text-teal-600 hover:bg-teal-100"
-          }`}
-        >
-          <MicIcon size={16} />
-        </button>
-      )}
-    </div>
-  )
-}
 
 export function ConsultationForm() {
   const [mode, setMode] = useState<EntryMode>("manual")
@@ -165,15 +96,15 @@ export function ConsultationForm() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <Label>📋 Chief Complaints</Label>
-              <FTextarea micButton placeholder="e.g. Pain and swelling in both hand joints for 3 months…" value={chiefComplaints} onChange={e => setChiefComplaints(e.target.value)} />
+              <Textarea placeholder="e.g. Pain and swelling in both hand joints for 3 months…" value={chiefComplaints} onChange={e => setChiefComplaints(e.target.value)} />
             </div>
             <div>
               <Label>🔍 Clinical Findings</Label>
-              <FTextarea micButton placeholder="e.g. Bilateral symmetric synovitis, MCP and PIP joints…" value={clinicalFindings} onChange={e => setClinicalFindings(e.target.value)} />
+              <Textarea placeholder="e.g. Bilateral symmetric synovitis, MCP and PIP joints…" value={clinicalFindings} onChange={e => setClinicalFindings(e.target.value)} />
             </div>
             <div className="sm:col-span-2">
               <Label>📌 Provisional Diagnosis</Label>
-              <FTextarea micButton placeholder="e.g. Seropositive Rheumatoid Arthritis — Moderate Activity" value={diagnosis} onChange={e => setDiagnosis(e.target.value)} rows={2} />
+              <Textarea placeholder="e.g. Seropositive Rheumatoid Arthritis — Moderate Activity" value={diagnosis} onChange={e => setDiagnosis(e.target.value)} rows={2} />
             </div>
           </div>
         </div>
@@ -200,11 +131,10 @@ export function ConsultationForm() {
                   <tr key={row.id} className={`border-b border-slate-50 ${i % 2 === 0 ? "bg-white" : "bg-slate-50/50"}`}>
                     {(["medicine", "dosage", "duration", "instructions"] as const).map(key => (
                       <td key={key} className="px-2 py-2">
-                        <input
+                        <Input
                           value={row[key]}
                           onChange={e => updateMed(row.id, key, e.target.value)}
                           placeholder={{ medicine: "Tab. Methotrexate", dosage: "15 mg", duration: "4 weeks", instructions: "Once weekly, after food" }[key]}
-                          className="w-full px-3 py-2 rounded-lg border-2 border-slate-200 bg-white text-slate-800 text-sm font-500 focus:outline-none focus:border-teal-400 transition-all placeholder:text-slate-300"
                         />
                       </td>
                     ))}
@@ -251,8 +181,7 @@ export function ConsultationForm() {
           <div>
             <p className="text-sm font-700 text-slate-500 mb-2">Search &amp; Add Other Tests:</p>
             <div className="max-w-sm">
-              <FInput
-                micButton
+              <Input
                 placeholder="Search tests…"
                 value={testSearch}
                 onChange={e => setTestSearch(e.target.value)}

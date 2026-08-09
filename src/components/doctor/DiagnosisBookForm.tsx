@@ -1,44 +1,11 @@
 import React, { useState } from "react"
 import { APPOINTMENTS } from "../../data/doctorData"
 import { Label } from "../ui/Label"
+import { Input } from "../ui/Input"
+import { Textarea } from "../ui/Textarea"
+import { Select } from "../ui/Select"
 import { PrimaryBtn, OutlineBtn } from "../ui/Buttons"
 import { Card } from "../ui/Card"
-import { ChevronIcon } from "../icons"
-
-function FInput({ ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
-  return (
-    <input
-      {...props}
-      className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-slate-50 text-slate-800 text-base font-500 focus:outline-none focus:border-teal-400 focus:bg-white transition-all placeholder:text-slate-400"
-    />
-  )
-}
-
-function FSelect({ children, ...props }: React.SelectHTMLAttributes<HTMLSelectElement>) {
-  return (
-    <div className="relative">
-      <select
-        {...props}
-        className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-slate-50 text-slate-800 text-base font-500 focus:outline-none focus:border-teal-400 focus:bg-white transition-all appearance-none pr-10"
-      >
-        {children}
-      </select>
-      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
-        <ChevronIcon />
-      </span>
-    </div>
-  )
-}
-
-function FTextarea({ ...props }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return (
-    <textarea
-      {...props}
-      rows={3}
-      className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-slate-50 text-slate-800 text-base font-500 focus:outline-none focus:border-teal-400 focus:bg-white transition-all placeholder:text-slate-400 resize-none"
-    />
-  )
-}
 
 export function DiagnosisBookForm() {
   const [appointment, setAppointment] = useState("")
@@ -53,22 +20,22 @@ export function DiagnosisBookForm() {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         <div>
           <Label>📅 Appointment</Label>
-          <FSelect value={appointment} onChange={e => setAppointment(e.target.value)}>
+          <Select value={appointment} onChange={e => setAppointment(e.target.value)}>
             <option value="">Select appointment…</option>
             {APPOINTMENTS.map(a => <option key={a}>{a}</option>)}
-          </FSelect>
+          </Select>
         </div>
         <div>
           <Label>🏥 Disease Name</Label>
-          <FInput placeholder="e.g. Rheumatoid Arthritis" value={disease} onChange={e => setDisease(e.target.value)} />
+          <Input placeholder="e.g. Rheumatoid Arthritis" value={disease} onChange={e => setDisease(e.target.value)} />
         </div>
         <div>
           <Label>📊 Stage</Label>
-          <FInput placeholder="e.g. Moderate, Early, Late" value={stage} onChange={e => setStage(e.target.value)} />
+          <Input placeholder="e.g. Moderate, Early, Late" value={stage} onChange={e => setStage(e.target.value)} />
         </div>
         <div>
           <Label>📝 Version Note</Label>
-          <FTextarea placeholder="e.g. Increased disease activity since last visit…" value={versionNote} onChange={e => setVersionNote(e.target.value)} />
+          <Textarea placeholder="e.g. Increased disease activity since last visit…" value={versionNote} onChange={e => setVersionNote(e.target.value)} />
         </div>
       </div>
 
