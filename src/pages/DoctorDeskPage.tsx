@@ -83,21 +83,22 @@ export function DoctorDeskPage({ onSwitchCompounder }: { onSwitchCompounder: () 
           ))}
         </div>
 
-        {/* ── ATTENDING TABLE ── */}
-        <PatientTable
-          title="Attending Patients"
-          patients={ATTENDING}
-          attending={true}
-          onAction={p => setSlideOver(p)}
-        />
+        {/* ── ATTENDING & ATTENDED TABLES SIDE BY SIDE ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <PatientTable
+            title="Attending Patients"
+            patients={ATTENDING}
+            attending={true}
+            onAction={p => setSlideOver(p)}
+          />
 
-        {/* ── ATTENDED TABLE ── */}
-        <PatientTable
-          title="Attended Patients"
-          patients={ATTENDED}
-          attending={false}
-          onAction={p => setSlideOver(p)}
-        />
+          <PatientTable
+            title="Attended Patients"
+            patients={ATTENDED}
+            attending={false}
+            onAction={p => setSlideOver(p)}
+          />
+        </div>
 
         {/* ── MAIN FORMS SECTION ── */}
         <div>
