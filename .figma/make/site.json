@@ -1,0 +1,10 @@
+{
+  "description": "A user-friendly dashboard designed for clinic compounders to manage patient registration, appointments, and medical history with ease and clarity.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
