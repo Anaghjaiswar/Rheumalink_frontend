@@ -19,7 +19,13 @@ function SectionTitle({ icon, title }: { icon: string; title: string }) {
   )
 }
 
-export function DoctorDeskPage({ onSwitchCompounder }: { onSwitchCompounder: () => void }) {
+export function DoctorDeskPage({
+  onSwitchCompounder,
+  onOpenJointChart,
+}: {
+  onSwitchCompounder: () => void
+  onOpenJointChart?: () => void
+}) {
   const [language, setLanguage] = useState("English")
   const [activeTab, setActiveTab] = useState<DoctorTab>("consultation")
   const [slideOver, setSlideOver] = useState<PatientSummary | null>(null)
@@ -126,7 +132,11 @@ export function DoctorDeskPage({ onSwitchCompounder }: { onSwitchCompounder: () 
                 {activeTab === "consultation" ? "📋 Consultation & Prescription" : "📖 Diagnosis Book"}
               </h3>
             </div>
-            {activeTab === "consultation" ? <ConsultationForm /> : <DiagnosisBookForm />}
+            {activeTab === "consultation" ? (
+              <ConsultationForm />
+            ) : (
+              <DiagnosisBookForm onOpenJointChart={onOpenJointChart} />
+            )}
           </div>
         </div>
 

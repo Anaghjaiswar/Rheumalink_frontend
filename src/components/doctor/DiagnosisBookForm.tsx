@@ -7,7 +7,7 @@ import { Select } from "../ui/Select"
 import { PrimaryBtn, OutlineBtn } from "../ui/Buttons"
 import { Card } from "../ui/Card"
 
-export function DiagnosisBookForm() {
+export function DiagnosisBookForm({ onOpenJointChart }: { onOpenJointChart?: () => void }) {
   const [appointment, setAppointment] = useState("")
   const [disease, setDisease] = useState("")
   const [stage, setStage] = useState("")
@@ -49,7 +49,7 @@ export function DiagnosisBookForm() {
             </div>
             <p className="text-slate-500 text-sm font-600">Joint chart is managed on a separate page. Create or view before saving diagnosis.</p>
           </div>
-          <OutlineBtn className="flex-shrink-0">Open Joint Chart Page</OutlineBtn>
+          <OutlineBtn onClick={onOpenJointChart} className="flex-shrink-0">Open Joint Chart Page</OutlineBtn>
         </Card>
 
         {/* Rheumatoid Symptoms */}
