@@ -1,6 +1,6 @@
 import React from "react"
 import { HeartPulseIcon, GlobeIcon, ChevronIcon, LogoutIcon } from "../icons"
-import { LANGUAGES } from "../../data/doctorData"
+import { VOICE_LANGUAGES } from "../../data/doctorData"
 
 export function DoctorTopNav({
   language,
@@ -39,15 +39,19 @@ export function DoctorTopNav({
             Compounder Dashboard
           </button>
 
-          {/* Language */}
+          {/* Voice Language Dropdown */}
           <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl border-2 border-slate-700 bg-slate-800 cursor-pointer hover:border-slate-600 transition-colors">
             <GlobeIcon />
+            <span className="text-xs font-700 text-slate-400 hidden md:inline">🎙️ Voice Lang:</span>
             <select
+              id="voice-lang-select"
               value={language}
               onChange={e => setLanguage(e.target.value)}
               className="appearance-none bg-transparent text-sm font-700 text-slate-300 focus:outline-none cursor-pointer pr-4"
             >
-              {LANGUAGES.map(l => <option key={l}>{l}</option>)}
+              {VOICE_LANGUAGES.map(l => (
+                <option key={l.code} value={l.code} className="bg-slate-900 text-slate-200">{l.label}</option>
+              ))}
             </select>
             <span className="text-slate-500 pointer-events-none"><ChevronIcon /></span>
           </div>

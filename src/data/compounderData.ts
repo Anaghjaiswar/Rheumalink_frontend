@@ -28,7 +28,15 @@ export const COMORBIDITIES = [
   "PUD (Peptic Ulcer)",
 ]
 
-export const LANGUAGES = ["English", "Hindi", "Marathi", "Gujarati", "Tamil", "Telugu", "Kannada"]
+export const VOICE_LANGUAGES = [
+  { code: "en-IN", label: "English (India) / Hinglish" },
+  { code: "en-US", label: "English (US)" },
+  { code: "hi-IN", label: "Hindi (हिन्दी)" },
+  { code: "mr-IN", label: "Marathi (મરાઠી)" },
+  { code: "gu-IN", label: "Gujarati (ગુજરાતી)" },
+  { code: "ta-IN", label: "Tamil (தமிழ்)" },
+]
+
 export const DOCTORS = ["Dr. Shweta Gupta", "Dr. Arvind Mehta", "Dr. Priya Nair"]
 
 export const STATUS_OPTS: { value: AppStatus; label: string; color: string }[] = [

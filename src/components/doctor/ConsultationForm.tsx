@@ -5,29 +5,81 @@ import { Label } from "../ui/Label"
 import { PrimaryBtn } from "../ui/Buttons"
 import { MicIcon, TrashIcon, PlusIcon, CalendarIcon } from "../icons"
 import { PrescriptionPreview } from "./PrescriptionPreview"
+import { useSpeechRecognition } from "../../hooks/useSpeechRecognition"
 
-function FInput({ ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
+function FInput({ micButton = false, language = "en-IN", value, onChange, ...props }: React.InputHTMLAttributes<HTMLInputElement> & { micButton?: boolean; language?: string }) {
+  const currentValue = typeof value === "string" ? value : ""
+  const handleSpeechUpdate = (newText: string) => {
+    if (onChange) {
+      onChange({ target: { value: newText } } as React.ChangeEvent<HTMLInputElement>)
+    }
+  }
+  const { isListening, toggleListening } = useSpeechRecognition(currentValue, handleSpeechUpdate, language)
+
   return (
-    <input
-      {...props}
-      className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-slate-50 text-slate-800 text-base font-500 focus:outline-none focus:border-teal-400 focus:bg-white transition-all placeholder:text-slate-400"
-    />
+    <div className="relative flex items-center">
+      <input
+        {...props}
+        value={value}
+        onChange={onChange}
+        className={`w-full px-4 py-3 rounded-xl border-2 bg-slate-50 text-slate-800 text-base font-500 focus:outline-none focus:border-teal-400 focus:bg-white transition-all placeholder:text-slate-400 ${micButton ? "pr-12" : ""} ${
+          isListening ? "border-red-500 bg-red-50/20 animate-pulse" : "border-slate-200"
+        }`}
+      />
+      {micButton && (
+        <button
+          type="button"
+          onClick={toggleListening}
+          title={isListening ? "Listening..." : "Voice to text"}
+          className={`absolute right-3 p-2 rounded-lg transition-colors ${
+            isListening ? "bg-red-500 text-white animate-bounce shadow-md" : "bg-teal-50 text-teal-600 hover:bg-teal-100"
+          }`}
+        >
+          <MicIcon size={15} />
+        </button>
+      )}
+    </div>
   )
 }
 
-function FTextarea({ ...props }: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
+function FTextarea({ micButton = false, language = "en-IN", value, onChange, ...props }: React.TextareaHTMLAttributes<HTMLTextAreaElement> & { micButton?: boolean; language?: string }) {
+  const currentValue = typeof value === "string" ? value : ""
+  const handleSpeechUpdate = (newText: string) => {
+    if (onChange) {
+      onChange({ target: { value: newText } } as React.ChangeEvent<HTMLTextAreaElement>)
+    }
+  }
+  const { isListening, toggleListening } = useSpeechRecognition(currentValue, handleSpeechUpdate, language)
+
   return (
-    <textarea
-      {...props}
-      rows={3}
-      className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-slate-50 text-slate-800 text-base font-500 focus:outline-none focus:border-teal-400 focus:bg-white transition-all placeholder:text-slate-400 resize-none"
-    />
+    <div className="relative">
+      <textarea
+        {...props}
+        value={value}
+        onChange={onChange}
+        rows={props.rows || 3}
+        className={`w-full px-4 py-3 rounded-xl border-2 bg-slate-50 text-slate-800 text-base font-500 focus:outline-none focus:border-teal-400 focus:bg-white transition-all placeholder:text-slate-400 resize-none ${micButton ? "pr-12" : ""} ${
+          isListening ? "border-red-500 bg-red-50/20 animate-pulse" : "border-slate-200"
+        }`}
+      />
+      {micButton && (
+        <button
+          type="button"
+          onClick={toggleListening}
+          title={isListening ? "Listening..." : "Voice to text"}
+          className={`absolute right-3 bottom-3 p-2 rounded-lg transition-colors ${
+            isListening ? "bg-red-500 text-white animate-bounce shadow-md" : "bg-teal-50 text-teal-600 hover:bg-teal-100"
+          }`}
+        >
+          <MicIcon size={16} />
+        </button>
+      )}
+    </div>
   )
 }
 
 export function ConsultationForm() {
   const [mode, setMode] = useState<EntryMode>("manual")
-  const [recording, setRecording] = useState(false)
   const [chiefComplaints, setChiefComplaints] = useState("")
   const [clinicalFindings, setClinicalFindings] = useState("")
   const [diagnosis, setDiagnosis] = useState("")
@@ -39,6 +91,12 @@ export function ConsultationForm() {
   const [followUp, setFollowUp] = useState("1 Month")
   const [postStatus, setPostStatus] = useState("Attended")
   const [showPreview, setShowPreview] = useState(false)
+
+  // Smart dictation hook for the central MedASR panel
+  const handleDictationResult = (text: string) => {
+    setChiefComplaints(text)
+  }
+  const { isListening: recording, toggleListening: toggleRecording } = useSpeechRecognition(chiefComplaints, handleDictationResult)
 
   const addMed = () => setMeds(m => [...m, { id: Date.now(), medicine: "", dosage: "", duration: "", instructions: "" }])
   const removeMed = (id: number) => setMeds(m => m.filter(r => r.id !== id))
@@ -71,21 +129,22 @@ export function ConsultationForm() {
           <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-6 space-y-5">
             <div className="flex items-center gap-3">
               <h3 className="font-800 text-white text-lg">🎙️ AI Smart Dictation (MedASR)</h3>
-              <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-700">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                Ready
+              <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-700 ${recording ? "bg-red-500/20 text-red-400" : "bg-emerald-500/20 text-emerald-400"}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${recording ? "bg-red-400 animate-ping" : "bg-emerald-400"}`} />
+                {recording ? "Listening..." : "Ready"}
               </span>
             </div>
             <div className="flex justify-center">
               <button
-                onClick={() => setRecording(r => !r)}
-                className={`w-24 h-24 rounded-full flex items-center justify-center transition-all shadow-lg ${recording ? "bg-red-500 hover:bg-red-600 scale-110 shadow-red-500/40" : "bg-teal-500 hover:bg-teal-400 shadow-teal-500/40"}`}
+                type="button"
+                onClick={toggleRecording}
+                className={`w-24 h-24 rounded-full flex items-center justify-center transition-all shadow-lg ${recording ? "bg-red-500 hover:bg-red-600 scale-110 shadow-red-500/40 animate-pulse" : "bg-teal-500 hover:bg-teal-400 shadow-teal-500/40"}`}
               >
                 <MicIcon size={36} />
               </button>
             </div>
             {recording && (
-              <p className="text-center text-red-400 font-700 text-sm animate-pulse">● Recording… Speak clearly</p>
+              <p className="text-center text-red-400 font-700 text-sm animate-pulse">● Dictating live... Speak clearly</p>
             )}
             <div className="bg-amber-50/10 border border-amber-400/30 rounded-xl p-4">
               <p className="text-amber-300 text-sm font-600 leading-relaxed">
@@ -106,15 +165,15 @@ export function ConsultationForm() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <Label>📋 Chief Complaints</Label>
-              <FTextarea placeholder="e.g. Pain and swelling in both hand joints for 3 months…" value={chiefComplaints} onChange={e => setChiefComplaints(e.target.value)} />
+              <FTextarea micButton placeholder="e.g. Pain and swelling in both hand joints for 3 months…" value={chiefComplaints} onChange={e => setChiefComplaints(e.target.value)} />
             </div>
             <div>
               <Label>🔍 Clinical Findings</Label>
-              <FTextarea placeholder="e.g. Bilateral symmetric synovitis, MCP and PIP joints…" value={clinicalFindings} onChange={e => setClinicalFindings(e.target.value)} />
+              <FTextarea micButton placeholder="e.g. Bilateral symmetric synovitis, MCP and PIP joints…" value={clinicalFindings} onChange={e => setClinicalFindings(e.target.value)} />
             </div>
             <div className="sm:col-span-2">
               <Label>📌 Provisional Diagnosis</Label>
-              <FTextarea placeholder="e.g. Seropositive Rheumatoid Arthritis — Moderate Activity" value={diagnosis} onChange={e => setDiagnosis(e.target.value)} rows={2} />
+              <FTextarea micButton placeholder="e.g. Seropositive Rheumatoid Arthritis — Moderate Activity" value={diagnosis} onChange={e => setDiagnosis(e.target.value)} rows={2} />
             </div>
           </div>
         </div>
@@ -191,15 +250,13 @@ export function ConsultationForm() {
           </div>
           <div>
             <p className="text-sm font-700 text-slate-500 mb-2">Search &amp; Add Other Tests:</p>
-            <div className="relative max-w-sm">
+            <div className="max-w-sm">
               <FInput
+                micButton
                 placeholder="Search tests…"
                 value={testSearch}
                 onChange={e => setTestSearch(e.target.value)}
               />
-              <button className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-lg bg-teal-50 text-teal-600 hover:bg-teal-100">
-                <MicIcon size={15} />
-              </button>
             </div>
           </div>
         </div>

@@ -1,6 +1,13 @@
 import { PatientSummary } from "../types/doctor"
 
-export const LANGUAGES = ["English", "Hindi", "Marathi", "Gujarati", "Tamil", "Telugu", "Kannada"]
+export const VOICE_LANGUAGES = [
+  { code: "en-IN", label: "English (India) / Hinglish" },
+  { code: "en-US", label: "English (US)" },
+  { code: "hi-IN", label: "Hindi (हिन्दी)" },
+  { code: "mr-IN", label: "Marathi (મરાઠી)" },
+  { code: "gu-IN", label: "Gujarati (ગુજરાતી)" },
+  { code: "ta-IN", label: "Tamil (தமிழ்)" },
+]
 
 export const LAB_TESTS = [
   "ANA (Antinuclear Antibody) by IFA",
