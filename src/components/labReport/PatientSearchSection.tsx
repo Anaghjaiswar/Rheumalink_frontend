@@ -39,6 +39,7 @@ export function PatientSearchSection({
         <div className="relative">
           <div className="relative">
             <Input
+              className="pl-10"
               placeholder="Type name, internal file number, or phone number to search…"
               value={query}
               onChange={e => {
@@ -47,7 +48,7 @@ export function PatientSearchSection({
               }}
               onFocus={() => setIsOpen(true)}
             />
-            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none z-10">
               <SearchIcon />
             </span>
           </div>
