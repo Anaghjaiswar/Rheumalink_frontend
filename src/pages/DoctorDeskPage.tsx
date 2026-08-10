@@ -25,11 +25,13 @@ export function DoctorDeskPage({
   onOpenJointChart,
   onOpenUploadLabReport,
   onOpenRheumDiagnosis,
+  onLogout,
 }: {
   onSwitchCompounder: () => void
   onOpenJointChart?: () => void
   onOpenUploadLabReport?: () => void
   onOpenRheumDiagnosis?: () => void
+  onLogout?: () => void
 }) {
   const [language, setLanguage] = useState("English")
   const [activeTab, setActiveTab] = useState<DoctorTab>("consultation")
@@ -56,7 +58,12 @@ export function DoctorDeskPage({
     <div className="min-h-screen bg-sky-50 font-sans">
       {slideOver && <PatientSummaryPanel patient={slideOver} onClose={() => setSlideOver(null)} />}
 
-      <DoctorTopNav language={language} setLanguage={setLanguage} onSwitchCompounder={onSwitchCompounder} />
+      <DoctorTopNav
+        language={language}
+        setLanguage={setLanguage}
+        onSwitchCompounder={onSwitchCompounder}
+        onLogout={onLogout}
+      />
 
       {/* ── MAIN CONTENT ── */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">

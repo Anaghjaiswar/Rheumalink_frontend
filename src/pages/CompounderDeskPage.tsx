@@ -42,9 +42,11 @@ function StatTile({ label, value, icon, bg, text }: { label: string; value: numb
 export function CompounderDeskPage({
   onSwitchDoctor,
   onOpenUploadLabReport,
+  onLogout,
 }: {
   onSwitchDoctor: () => void
   onOpenUploadLabReport?: () => void
+  onLogout?: () => void
 }) {
   const [language, setLanguage] = useState("en-IN")
   const [activeTab, setActiveTab] = useState<CompounderTab>("register")
@@ -69,7 +71,12 @@ export function CompounderDeskPage({
     <div className="min-h-screen bg-sky-50 font-sans">
       {slideOver && <PatientSummaryPanel patient={slideOver} onClose={() => setSlideOver(null)} />}
 
-      <TopNav language={language} setLanguage={setLanguage} onSwitchDoctor={onSwitchDoctor} />
+      <TopNav
+        language={language}
+        setLanguage={setLanguage}
+        onSwitchDoctor={onSwitchDoctor}
+        onLogout={onLogout}
+      />
 
       {/* ── MAIN CONTENT ── */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">

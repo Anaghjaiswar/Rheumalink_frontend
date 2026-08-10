@@ -1,10 +1,18 @@
+import { getStoredToken } from "./auth"
+
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000"
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${BASE_URL}${endpoint}`
-  const headers = {
+  const token = getStoredToken()
+
+  const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    ...(options.headers || {}),
+    ...(options.headers as Record<string, string> || {}),
+  }
+
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`
   }
 
   const response = await fetch(url, {
@@ -80,8 +88,15 @@ export async function saveRumatDiagnosis(appointmentId: string | number, payload
 // ── LAB REPORT API ──
 export async function uploadLabReportTemp(formData: FormData) {
   const url = `${BASE_URL}/api/lab-report/upload-temp/`
+  const token = getStoredToken()
+  const headers: Record<string, string> = {}
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`
+  }
+
   const response = await fetch(url, {
     method: "POST",
+    headers,
     body: formData,
   })
   return response.json()

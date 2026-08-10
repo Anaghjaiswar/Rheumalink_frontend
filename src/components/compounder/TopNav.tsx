@@ -6,10 +6,12 @@ export function TopNav({
   language,
   setLanguage,
   onSwitchDoctor,
+  onLogout,
 }: {
   language: string
   setLanguage: (lang: string) => void
   onSwitchDoctor: () => void
+  onLogout?: () => void
 }) {
   return (
     <nav className="sticky top-0 z-50 bg-slate-900 border-b border-slate-800 shadow-lg">
@@ -34,7 +36,7 @@ export function TopNav({
           {/* Doctor Switch Button */}
           <button
             onClick={onSwitchDoctor}
-            className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-teal-500/40 text-teal-400 font-700 text-sm hover:bg-teal-500/10 transition-colors"
+            className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-teal-500/40 text-teal-400 font-700 text-sm hover:bg-teal-500/10 transition-colors cursor-pointer"
           >
             Doctor Dashboard
           </button>
@@ -57,7 +59,10 @@ export function TopNav({
           </div>
 
           {/* Logout */}
-          <button className="flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-slate-600 text-slate-300 font-700 text-sm hover:bg-slate-800 hover:border-slate-500 transition-colors">
+          <button
+            onClick={onLogout}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-slate-600 text-slate-300 font-700 text-sm hover:bg-slate-800 hover:border-slate-500 transition-colors cursor-pointer"
+          >
             <LogoutIcon /> <span className="hidden sm:inline">Logout</span>
           </button>
         </div>
