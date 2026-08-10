@@ -23,10 +23,12 @@ export function DoctorDeskPage({
   onSwitchCompounder,
   onOpenJointChart,
   onOpenUploadLabReport,
+  onOpenRheumDiagnosis,
 }: {
   onSwitchCompounder: () => void
   onOpenJointChart?: () => void
   onOpenUploadLabReport?: () => void
+  onOpenRheumDiagnosis?: () => void
 }) {
   const [language, setLanguage] = useState("English")
   const [activeTab, setActiveTab] = useState<DoctorTab>("consultation")
@@ -140,7 +142,7 @@ export function DoctorDeskPage({
             {activeTab === "consultation" ? (
               <ConsultationForm />
             ) : (
-              <DiagnosisBookForm onOpenJointChart={onOpenJointChart} />
+              <DiagnosisBookForm onOpenJointChart={onOpenJointChart} onOpenRheumDiagnosis={onOpenRheumDiagnosis} />
             )}
           </div>
         </div>

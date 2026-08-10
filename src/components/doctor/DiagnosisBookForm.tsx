@@ -7,7 +7,13 @@ import { Select } from "../ui/Select"
 import { PrimaryBtn, OutlineBtn } from "../ui/Buttons"
 import { Card } from "../ui/Card"
 
-export function DiagnosisBookForm({ onOpenJointChart }: { onOpenJointChart?: () => void }) {
+export function DiagnosisBookForm({
+  onOpenJointChart,
+  onOpenRheumDiagnosis,
+}: {
+  onOpenJointChart?: () => void
+  onOpenRheumDiagnosis?: () => void
+}) {
   const [appointment, setAppointment] = useState("")
   const [disease, setDisease] = useState("")
   const [stage, setStage] = useState("")
@@ -61,7 +67,7 @@ export function DiagnosisBookForm({ onOpenJointChart }: { onOpenJointChart?: () 
             </div>
             <p className="text-slate-500 text-sm font-600">Fill detailed symptoms checklist and generate professional clinical notes using AI on a separate page.</p>
           </div>
-          <OutlineBtn className="flex-shrink-0">Open Rheum Diagnosis Page</OutlineBtn>
+          <OutlineBtn onClick={onOpenRheumDiagnosis} className="flex-shrink-0">Open Rheum Diagnosis Page</OutlineBtn>
         </Card>
 
         {/* DAS28 */}

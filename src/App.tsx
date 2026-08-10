@@ -3,9 +3,14 @@ import { CompounderDeskPage } from './pages/CompounderDeskPage'
 import { DoctorDeskPage } from './pages/DoctorDeskPage'
 import { JointChartPage } from './pages/JointChartPage'
 import { UploadLabReportPage } from './pages/UploadLabReportPage'
+import { RheumatDiagnosisPage } from './pages/RheumatDiagnosisPage'
 
 export default function App() {
-  const [view, setView] = useState<'compounder' | 'doctor' | 'joint-chart' | 'upload-lab-report'>('compounder')
+  const [view, setView] = useState<'compounder' | 'doctor' | 'joint-chart' | 'upload-lab-report' | 'rheumat-diagnosis'>('compounder')
+
+  if (view === 'rheumat-diagnosis') {
+    return <RheumatDiagnosisPage onBackToDashboard={() => setView('doctor')} />
+  }
 
   if (view === 'upload-lab-report') {
     return <UploadLabReportPage onBackToDashboard={() => setView('doctor')} />
@@ -21,6 +26,7 @@ export default function App() {
         onSwitchCompounder={() => setView('compounder')}
         onOpenJointChart={() => setView('joint-chart')}
         onOpenUploadLabReport={() => setView('upload-lab-report')}
+        onOpenRheumDiagnosis={() => setView('rheumat-diagnosis')}
       />
     )
   }
