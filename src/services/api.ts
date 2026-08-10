@@ -61,6 +61,36 @@ export async function saveConsultation(appointmentId: string | number, payload: 
   })
 }
 
+export async function saveDiagnosis(appointmentId: string | number, payload: any) {
+  return request<any>(`/api/v1/doctor/diagnosis/${appointmentId}/save/`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  })
+}
+
+// ── VITALS & MEDICAL INFO API ──
+export async function fetchVitals(appointmentId: string | number) {
+  return request<any>(`/api/v1/vitals/${appointmentId}/`)
+}
+
+export async function saveVitals(appointmentId: string | number, payload: any) {
+  return request<any>(`/api/v1/vitals/${appointmentId}/save/`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function fetchMedicalInfo(patientId: string | number) {
+  return request<any>(`/api/v1/medical-info/${patientId}/`)
+}
+
+export async function saveMedicalInfo(patientId: string | number, payload: any) {
+  return request<any>(`/api/v1/medical-info/${patientId}/save/`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  })
+}
+
 // ── JOINT ASSESSMENT CHART API ──
 export async function fetchJointChart(appointmentId: string | number) {
   return request<any>(`/api/v1/joint-chart/${appointmentId}/`)
@@ -83,6 +113,19 @@ export async function saveRumatDiagnosis(appointmentId: string | number, payload
     method: "POST",
     body: JSON.stringify(payload),
   })
+}
+
+// ── ANALYTICS & AUTOCOMPLETE ──
+export async function fetchDAS28Score(appointmentId: string | number) {
+  return request<any>(`/api/v1/das28/${appointmentId}/`)
+}
+
+export async function autosuggestMedicine(query: string) {
+  return request<any>(`/api/v1/autosuggest/medicine/?q=${encodeURIComponent(query)}`)
+}
+
+export async function autosuggestLabTest(query: string) {
+  return request<any>(`/api/v1/autosuggest/labtest/?q=${encodeURIComponent(query)}`)
 }
 
 // ── LAB REPORT API ──
@@ -110,5 +153,11 @@ export async function saveExtractedLabData(reportId: string | number, testData: 
   return request<any>(`/api/lab-report/save/${reportId}/`, {
     method: "POST",
     body: JSON.stringify({ test_data: testData }),
+  })
+}
+
+export async function sendPrescriptionWhatsapp(prescriptionId: string | number) {
+  return request<any>(`/api/v1/prescription/${prescriptionId}/send/`, {
+    method: "POST",
   })
 }
