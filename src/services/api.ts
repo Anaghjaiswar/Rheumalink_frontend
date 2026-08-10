@@ -28,6 +28,11 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   return response.json()
 }
 
+// ── CLINIC SETTINGS API (CACHED FROM REDIS DB) ──
+export async function fetchClinicSettings() {
+  return request<{ ok: boolean; name: string; contact_email: string; contact_number: string; address: string; logo_url: string | null }>("/api/v1/clinic/settings/")
+}
+
 // ── COMPOUNDER API ──
 export async function fetchCompounderDashboard(searchQ?: string) {
   const query = searchQ ? `?search_q=${encodeURIComponent(searchQ)}` : ""
