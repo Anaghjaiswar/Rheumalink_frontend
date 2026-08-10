@@ -1,4 +1,4 @@
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { DoctorTab, PatientSummary } from "../types/doctor"
 import { ATTENDING, ATTENDED } from "../data/doctorData"
 import { DoctorTopNav } from "../components/doctor/DoctorTopNav"
@@ -9,6 +9,7 @@ import { DiagnosisBookForm } from "../components/doctor/DiagnosisBookForm"
 import {
   UploadIcon, SearchIcon, ClockIcon, StethoscopeIcon, CheckCircleIcon, CalendarIcon
 } from "../components/icons"
+import { fetchDoctorDashboard } from "../services/api"
 
 function SectionTitle({ icon, title }: { icon: string; title: string }) {
   return (
@@ -34,6 +35,22 @@ export function DoctorDeskPage({
   const [activeTab, setActiveTab] = useState<DoctorTab>("consultation")
   const [slideOver, setSlideOver] = useState<PatientSummary | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
+
+  const [attendingList, setAttendingList] = useState<PatientSummary[]>(ATTENDING)
+  const [attendedList, setAttendedList] = useState<PatientSummary[]>(ATTENDED)
+  const [counts, setCounts] = useState({ waiting: 5, attending: 1, attended: 2, total_today: 8 })
+
+  useEffect(() => {
+    fetchDoctorDashboard()
+      .then(res => {
+        if (res.ok) {
+          if (res.attending) setAttendingList(res.attending)
+          if (res.attended) setAttendedList(res.attended)
+          if (res.counts) setCounts(res.counts)
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   return (
     <div className="min-h-screen bg-sky-50 font-sans">
@@ -81,10 +98,10 @@ export function DoctorDeskPage({
         {/* ── TODAY'S SUMMARY STATS ── */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           {[
-            { label: "Waiting", value: 5, icon: <ClockIcon />, bg: "bg-slate-100", text: "text-slate-600", iconBg: "bg-slate-200" },
-            { label: "Attending", value: 1, icon: <StethoscopeIcon />, bg: "bg-amber-50", text: "text-amber-700", iconBg: "bg-amber-100" },
-            { label: "Attended", value: 2, icon: <CheckCircleIcon />, bg: "bg-emerald-50", text: "text-emerald-700", iconBg: "bg-emerald-100" },
-            { label: "Total Today", value: 8, icon: <CalendarIcon />, bg: "bg-sky-50", text: "text-sky-700", iconBg: "bg-sky-100" },
+            { label: "Waiting", value: counts.waiting, icon: <ClockIcon />, bg: "bg-slate-100", text: "text-slate-600", iconBg: "bg-slate-200" },
+            { label: "Attending", value: counts.attending, icon: <StethoscopeIcon />, bg: "bg-amber-50", text: "text-amber-700", iconBg: "bg-amber-100" },
+            { label: "Attended", value: counts.attended, icon: <CheckCircleIcon />, bg: "bg-emerald-50", text: "text-emerald-700", iconBg: "bg-emerald-100" },
+            { label: "Total Today", value: counts.total_today, icon: <CalendarIcon />, bg: "bg-sky-50", text: "text-sky-700", iconBg: "bg-sky-100" },
           ].map(stat => (
             <div key={stat.label} className={`${stat.bg} rounded-2xl p-5 border border-white/80 shadow-sm`}>
               <div className={`w-10 h-10 ${stat.iconBg} rounded-xl flex items-center justify-center ${stat.text} mb-3`}>
@@ -100,14 +117,14 @@ export function DoctorDeskPage({
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <PatientTable
             title="Attending Patients"
-            patients={ATTENDING}
+            patients={attendingList}
             attending={true}
             onAction={p => setSlideOver(p)}
           />
 
           <PatientTable
             title="Attended Patients"
-            patients={ATTENDED}
+            patients={attendedList}
             attending={false}
             onAction={p => setSlideOver(p)}
           />

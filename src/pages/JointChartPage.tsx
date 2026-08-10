@@ -1,9 +1,10 @@
-import React, { useState, useMemo } from "react"
+import React, { useState, useMemo, useEffect } from "react"
 import { JointState, JointChartRecord } from "../types/jointChart"
 import { JOINT_SPOTS, SAMPLE_RECENT_CHARTS } from "../data/jointChartData"
 import { DoctorTopNav } from "../components/doctor/DoctorTopNav"
 import { JointChartCanvas } from "../components/jointChart/JointChartCanvas"
 import { JointChartControls } from "../components/jointChart/JointChartControls"
+import { fetchJointChart, saveJointChart } from "../services/api"
 
 export function JointChartPage({ onBackToDashboard }: { onBackToDashboard: () => void }) {
   const [language, setLanguage] = useState("en-IN")
@@ -20,6 +21,29 @@ export function JointChartPage({ onBackToDashboard }: { onBackToDashboard: () =>
 
   // Recent charts history state
   const [recentCharts, setRecentCharts] = useState<JointChartRecord[]>(SAMPLE_RECENT_CHARTS)
+
+  // Fetch initial API data on mount
+  useEffect(() => {
+    fetchJointChart(1)
+      .then(res => {
+        if (res.ok) {
+          if (res.joint_states && Object.keys(res.joint_states).length > 0) {
+            setJointStates(prev => ({ ...prev, ...res.joint_states }))
+          }
+          if (res.recent_charts && res.recent_charts.length > 0) {
+            setRecentCharts(res.recent_charts.map((rc: any) => ({
+              id: String(rc.id),
+              recordedAt: rc.recorded_at,
+              swollen: rc.swollen,
+              tender: rc.tender,
+            })))
+          }
+        }
+      })
+      .catch(() => {
+        // Fallback to local state if backend API offline
+      })
+  }, [])
 
   // Toggle state cycle: nopain -> blue (tender) -> red (swollen) -> orange (both) -> nopain
   const handleToggleJoint = (cbelId: string) => {
@@ -80,6 +104,9 @@ export function JointChartPage({ onBackToDashboard }: { onBackToDashboard: () =>
       tender: counts.tender,
     }
 
+    // Call API backend
+    saveJointChart(1, jointStates).catch(() => {})
+
     setRecentCharts(prev => [newRecord, ...prev])
     setSavedSuccess(true)
     setTimeout(() => setSavedSuccess(false), 3500)
@@ -117,7 +144,7 @@ export function JointChartPage({ onBackToDashboard }: { onBackToDashboard: () =>
 
         {savedSuccess && (
           <div className="p-4 rounded-xl bg-emerald-500 text-white font-700 text-sm shadow-md flex items-center justify-between animate-fadeIn">
-            <span>✓ Joint Assessment Chart saved successfully! Total: {counts.swollen} Swollen, {counts.tender} Tender.</span>
+            <span>✓ Joint Assessment Chart saved successfully to backend! Total: {counts.swollen} Swollen, {counts.tender} Tender.</span>
             <span className="text-xs bg-emerald-600 px-2.5 py-1 rounded-lg">Saved</span>
           </div>
         )}

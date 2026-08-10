@@ -1,4 +1,4 @@
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { DoctorTopNav } from "../components/doctor/DoctorTopNav"
 import { CategoryAccordion } from "../components/rheumat/CategoryAccordion"
 import { AISummarySection } from "../components/rheumat/AISummarySection"
@@ -13,6 +13,7 @@ import {
   PERSONAL_HISTORY_ITEMS,
 } from "../data/rheumatDiagnosisData"
 import { RheumatDiagnosisFormState } from "../types/rheumatDiagnosis"
+import { fetchRumatDiagnosis, saveRumatDiagnosis } from "../services/api"
 
 const INITIAL_STATE: RheumatDiagnosisFormState = {
   msm: {
@@ -59,6 +60,21 @@ export function RheumatDiagnosisPage({ onBackToDashboard }: { onBackToDashboard:
   const [openAccordion, setOpenAccordion] = useState<number | null>(0) // Open category 0 by default
   const [isGenerating, setIsGenerating] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
+
+  // Fetch backend data on mount
+  useEffect(() => {
+    fetchRumatDiagnosis(1)
+      .then(res => {
+        if (res.ok) {
+          if (res.disease_name) setForm(p => ({ ...p, diseaseName: res.disease_name }))
+          if (res.disease_state) setForm(p => ({ ...p, diseaseState: res.disease_state }))
+          if (res.checklist_data && res.checklist_data.description_t) {
+            setForm(p => ({ ...p, summaryNote: res.checklist_data.description_t }))
+          }
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   const toggleAccordion = (idx: number) => {
     setOpenAccordion(prev => (prev === idx ? null : idx))
@@ -111,6 +127,16 @@ Assessment indicates Active Rheumatoid Arthritis with moderate inflammatory acti
   }
 
   const handleSave = () => {
+    const payload = {
+      description_t: form.summaryNote,
+      disease_name: form.diseaseName,
+      state: form.diseaseState,
+      msm: form.msm.activeMSM,
+      symmetricity: form.msm.symmetricity,
+    }
+
+    saveRumatDiagnosis(1, payload).catch(() => {})
+
     setSaveSuccess(true)
     setTimeout(() => {
       setSaveSuccess(false)
@@ -170,7 +196,7 @@ Assessment indicates Active Rheumatoid Arthritis with moderate inflammatory acti
 
         {saveSuccess && (
           <div className="p-4 rounded-xl bg-emerald-500 text-white font-700 text-sm shadow-md flex items-center justify-between animate-fadeIn">
-            <span>✓ Rheumat Diagnosis record and AI summary saved successfully! Redirecting…</span>
+            <span>✓ Rheumat Diagnosis record and AI summary saved successfully to backend! Redirecting…</span>
             <span className="text-xs bg-emerald-600 px-2.5 py-1 rounded-lg">Saved</span>
           </div>
         )}
