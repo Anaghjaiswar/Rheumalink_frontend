@@ -117,20 +117,34 @@ export function DoctorDeskPage({
         <div>
           <SectionTitle icon="⚡" title="Quick Actions" />
 
-          {/* Tab bar */}
+          {/* Tab bar & Quick Launchers */}
           <div className="flex gap-2 mb-4 flex-wrap">
-            {([
-              { id: "consultation" as DoctorTab, label: "📋 Consultation & Prescription" },
-              { id: "diagnosis" as DoctorTab, label: "📖 Diagnosis Book" },
-            ]).map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`px-5 py-3 rounded-xl font-700 text-sm transition-all border-2 ${activeTab === tab.id ? "bg-teal-600 text-white border-teal-600 shadow-sm" : "bg-white text-slate-600 border-slate-200 hover:border-teal-300 hover:bg-teal-50"}`}
-              >
-                {tab.label}
-              </button>
-            ))}
+            <button
+              onClick={() => setActiveTab("consultation")}
+              className={`px-5 py-3 rounded-xl font-700 text-sm transition-all border-2 ${activeTab === "consultation" ? "bg-teal-600 text-white border-teal-600 shadow-sm" : "bg-white text-slate-600 border-slate-200 hover:border-teal-300 hover:bg-teal-50"}`}
+            >
+              📋 Consultation &amp; Prescription
+            </button>
+            <button
+              onClick={() => setActiveTab("diagnosis")}
+              className={`px-5 py-3 rounded-xl font-700 text-sm transition-all border-2 ${activeTab === "diagnosis" ? "bg-teal-600 text-white border-teal-600 shadow-sm" : "bg-white text-slate-600 border-slate-200 hover:border-teal-300 hover:bg-teal-50"}`}
+            >
+              📖 Diagnosis Book
+            </button>
+
+            {/* Direct Quick Launch Buttons */}
+            <button
+              onClick={onOpenRheumDiagnosis}
+              className="px-4 py-3 rounded-xl font-700 text-sm transition-all border-2 bg-teal-50 text-teal-800 border-teal-300 hover:bg-teal-100 flex items-center gap-1.5 cursor-pointer shadow-2xs"
+            >
+              <span>📖</span> Open Rheum Diagnosis
+            </button>
+            <button
+              onClick={onOpenJointChart}
+              className="px-4 py-3 rounded-xl font-700 text-sm transition-all border-2 bg-sky-50 text-sky-800 border-sky-300 hover:bg-sky-100 flex items-center gap-1.5 cursor-pointer shadow-2xs"
+            >
+              <span>🦴</span> Open Joint Chart
+            </button>
           </div>
 
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
@@ -142,7 +156,10 @@ export function DoctorDeskPage({
             {activeTab === "consultation" ? (
               <ConsultationForm />
             ) : (
-              <DiagnosisBookForm onOpenJointChart={onOpenJointChart} onOpenRheumDiagnosis={onOpenRheumDiagnosis} />
+              <DiagnosisBookForm
+                onOpenJointChart={onOpenJointChart}
+                onOpenRheumDiagnosis={onOpenRheumDiagnosis}
+              />
             )}
           </div>
         </div>

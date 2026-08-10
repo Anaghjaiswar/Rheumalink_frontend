@@ -46,28 +46,30 @@ export function DiagnosisBookForm({
       </div>
 
       <div className="border-t border-slate-100 pt-6 space-y-4">
-        {/* Joint Chart Entry */}
-        <Card className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        {/* Rheumatoid Symptoms Checklist Card */}
+        <Card className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-2 border-teal-200 bg-teal-50/40 shadow-xs">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
-              <p className="font-800 text-slate-800">🦴 Joint Chart Entry</p>
-              <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-700 border border-emerald-200">✅ Completed (5 Swollen, 10 Tender)</span>
+              <p className="font-800 text-slate-800 text-base">📖 Rheumatoid Symptoms Checklist &amp; AI Notes</p>
+              <span className="px-2.5 py-1 rounded-full bg-teal-100 text-teal-800 text-xs font-700 border border-teal-200">12 Categories</span>
             </div>
-            <p className="text-slate-500 text-sm font-600">Joint chart is managed on a separate page. Create or view before saving diagnosis.</p>
+            <p className="text-slate-600 text-sm font-500">Fill detailed 12-category symptoms checklist and generate professional clinical summary notes using AI.</p>
           </div>
-          <OutlineBtn onClick={onOpenJointChart} className="flex-shrink-0">Open Joint Chart Page</OutlineBtn>
+          <PrimaryBtn onClick={onOpenRheumDiagnosis} className="flex-shrink-0 text-sm py-2.5 px-5 shadow-md">
+            Open Rheum Diagnosis Page ➔
+          </PrimaryBtn>
         </Card>
 
-        {/* Rheumatoid Symptoms */}
+        {/* Joint Chart Entry Card */}
         <Card className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
-              <p className="font-800 text-slate-800">📋 Rheumatoid Symptoms Checklist (AI Summary)</p>
-              <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-700 border border-emerald-200">✅ Completed</span>
+              <p className="font-800 text-slate-800">🦴 Joint Chart Entry (44 Joints)</p>
+              <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-700 border border-emerald-200">✅ Active Homunculus</span>
             </div>
-            <p className="text-slate-500 text-sm font-600">Fill detailed symptoms checklist and generate professional clinical notes using AI on a separate page.</p>
+            <p className="text-slate-500 text-sm font-600">Joint chart homunculus is managed on a dedicated interactive 725x1100 canvas.</p>
           </div>
-          <OutlineBtn onClick={onOpenRheumDiagnosis} className="flex-shrink-0">Open Rheum Diagnosis Page</OutlineBtn>
+          <OutlineBtn onClick={onOpenJointChart} className="flex-shrink-0">Open Joint Chart Page</OutlineBtn>
         </Card>
 
         {/* DAS28 */}
