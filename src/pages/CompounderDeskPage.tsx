@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react"
 import { CompounderTab } from "../types/compounder"
-import { ATTENDING_TODAY, ATTENDED_TODAY } from "../data/compounderData"
 import { TopNav } from "../components/compounder/TopNav"
 import { RegisterPatientForm } from "../components/compounder/RegisterPatientForm"
 import { CreateAppointmentForm } from "../components/compounder/CreateAppointmentForm"
@@ -53,15 +52,21 @@ export function CompounderDeskPage({
   const [searchQuery, setSearchQuery] = useState("")
   const [slideOver, setSlideOver] = useState<PatientSummary | null>(null)
 
-  const [attendingList, setAttendingList] = useState(ATTENDING_TODAY)
-  const [attendedList, setAttendedList] = useState(ATTENDED_TODAY)
-  const [counts, setCounts] = useState({ waiting: 3, attending: 1, attended: 1, total_today: 5 })
+  const [attendingList, setAttendingList] = useState<any[]>([])
+  const [attendedList, setAttendedList] = useState<any[]>([])
+  const [counts, setCounts] = useState({ waiting: 0, attending: 0, attended: 0, total_today: 0 })
 
   useEffect(() => {
     fetchCompounderDashboard()
       .then(res => {
         if (res.ok) {
           if (res.counts) setCounts(res.counts)
+          if (res.today_appointments) {
+            const attending = res.today_appointments.filter((a: any) => a.status_code === 'I')
+            const attended = res.today_appointments.filter((a: any) => a.status_code === 'A')
+            setAttendingList(attending)
+            setAttendedList(attended)
+          }
         }
       })
       .catch(() => {})
@@ -146,31 +151,39 @@ export function CompounderDeskPage({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm font-600 text-slate-700">
-                {attendingList.map(row => (
-                  <tr key={row.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-4 py-3.5 whitespace-nowrap font-800 text-amber-600">{row.token}</td>
-                    <td className="px-4 py-3.5 whitespace-nowrap font-700 text-slate-900">{row.name}</td>
-                    <td className="px-4 py-3.5 whitespace-nowrap text-slate-500">{row.file}</td>
-                    <td className="px-4 py-3.5 whitespace-nowrap">{row.doctor}</td>
-                    <td className="px-4 py-3.5 whitespace-nowrap">
-                      <button
-                        onClick={() => setSlideOver({
-                          name: row.name,
-                          file: row.file,
-                          ext: "EXT-883",
-                          bloodGroup: "B+",
-                          allergies: "None",
-                          familyHistory: "Rheumatoid Arthritis in mother",
-                          comorbidities: ["Hypertension"],
-                          vitals: [{ label: "BP", value: "120/80" }, { label: "Pulse", value: "72 bpm" }],
-                        })}
-                        className="px-3 py-1.5 rounded-lg bg-teal-50 text-teal-700 font-700 text-xs hover:bg-teal-100 transition-colors"
-                      >
-                        View Summary
-                      </button>
+                {attendingList.length > 0 ? (
+                  attendingList.map(row => (
+                    <tr key={row.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="px-4 py-3.5 whitespace-nowrap font-800 text-amber-600">{row.token}</td>
+                      <td className="px-4 py-3.5 whitespace-nowrap font-700 text-slate-900">{row.patient_name || row.name}</td>
+                      <td className="px-4 py-3.5 whitespace-nowrap text-slate-500">{row.file}</td>
+                      <td className="px-4 py-3.5 whitespace-nowrap">{row.doctor}</td>
+                      <td className="px-4 py-3.5 whitespace-nowrap">
+                        <button
+                          onClick={() => setSlideOver({
+                            name: row.patient_name || row.name,
+                            file: row.file,
+                            ext: "-",
+                            bloodGroup: "-",
+                            allergies: "None recorded",
+                            familyHistory: "None on record",
+                            comorbidities: [],
+                            vitals: [],
+                          })}
+                          className="px-3 py-1.5 rounded-lg bg-teal-50 text-teal-700 font-700 text-xs hover:bg-teal-100 transition-colors"
+                        >
+                          View Summary
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-6 text-center text-slate-400 font-600 text-xs">
+                      No attending patients in queue.
                     </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </TableSection>
@@ -187,31 +200,39 @@ export function CompounderDeskPage({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm font-600 text-slate-700">
-                {attendedList.map(row => (
-                  <tr key={row.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-4 py-3.5 whitespace-nowrap font-800 text-emerald-600">{row.token}</td>
-                    <td className="px-4 py-3.5 whitespace-nowrap font-700 text-slate-900">{row.name}</td>
-                    <td className="px-4 py-3.5 whitespace-nowrap text-slate-500">{row.file}</td>
-                    <td className="px-4 py-3.5 whitespace-nowrap">{row.doctor}</td>
-                    <td className="px-4 py-3.5 whitespace-nowrap">
-                      <button
-                        onClick={() => setSlideOver({
-                          name: row.name,
-                          file: row.file,
-                          ext: "EXT-104",
-                          bloodGroup: "O+",
-                          allergies: "Sulfa drugs",
-                          familyHistory: "Diabetes",
-                          comorbidities: [],
-                          vitals: [{ label: "BP", value: "118/76" }],
-                        })}
-                        className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 font-700 text-xs hover:bg-slate-200 transition-colors"
-                      >
-                        View Summary
-                      </button>
+                {attendedList.length > 0 ? (
+                  attendedList.map(row => (
+                    <tr key={row.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="px-4 py-3.5 whitespace-nowrap font-800 text-emerald-600">{row.token}</td>
+                      <td className="px-4 py-3.5 whitespace-nowrap font-700 text-slate-900">{row.patient_name || row.name}</td>
+                      <td className="px-4 py-3.5 whitespace-nowrap text-slate-500">{row.file}</td>
+                      <td className="px-4 py-3.5 whitespace-nowrap">{row.doctor}</td>
+                      <td className="px-4 py-3.5 whitespace-nowrap">
+                        <button
+                          onClick={() => setSlideOver({
+                            name: row.patient_name || row.name,
+                            file: row.file,
+                            ext: "-",
+                            bloodGroup: "-",
+                            allergies: "None recorded",
+                            familyHistory: "None on record",
+                            comorbidities: [],
+                            vitals: [],
+                          })}
+                          className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 font-700 text-xs hover:bg-slate-200 transition-colors"
+                        >
+                          View Summary
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-6 text-center text-slate-400 font-600 text-xs">
+                      No attended patients recorded today.
                     </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </TableSection>

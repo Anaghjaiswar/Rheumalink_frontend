@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react"
 import { JointState, JointChartRecord } from "../types/jointChart"
-import { JOINT_SPOTS, SAMPLE_RECENT_CHARTS } from "../data/jointChartData"
+import { JOINT_SPOTS } from "../data/jointChartData"
 import { DoctorTopNav } from "../components/doctor/DoctorTopNav"
 import { JointChartCanvas } from "../components/jointChart/JointChartCanvas"
 import { JointChartControls } from "../components/jointChart/JointChartControls"
@@ -19,8 +19,8 @@ export function JointChartPage({ onBackToDashboard }: { onBackToDashboard: () =>
     return initial
   })
 
-  // Recent charts history state
-  const [recentCharts, setRecentCharts] = useState<JointChartRecord[]>(SAMPLE_RECENT_CHARTS)
+  // Recent charts history state (starts empty, populated ONLY by DB API)
+  const [recentCharts, setRecentCharts] = useState<JointChartRecord[]>([])
 
   // Fetch initial API data on mount
   useEffect(() => {
@@ -30,7 +30,7 @@ export function JointChartPage({ onBackToDashboard }: { onBackToDashboard: () =>
           if (res.joint_states && Object.keys(res.joint_states).length > 0) {
             setJointStates(prev => ({ ...prev, ...res.joint_states }))
           }
-          if (res.recent_charts && res.recent_charts.length > 0) {
+          if (res.recent_charts) {
             setRecentCharts(res.recent_charts.map((rc: any) => ({
               id: String(rc.id),
               recordedAt: rc.recorded_at,
@@ -40,9 +40,7 @@ export function JointChartPage({ onBackToDashboard }: { onBackToDashboard: () =>
           }
         }
       })
-      .catch(() => {
-        // Fallback to local state if backend API offline
-      })
+      .catch(() => {})
   }, [])
 
   // Toggle state cycle: nopain -> blue (tender) -> red (swollen) -> orange (both) -> nopain
@@ -130,7 +128,7 @@ export function JointChartPage({ onBackToDashboard }: { onBackToDashboard: () =>
               </span>
             </div>
             <p className="text-slate-500 font-600 text-sm mt-1">
-              Patient: <span className="text-slate-800 font-800">Alpa Jaiswar</span> (File: RL-26-00011) · Appointment Token: <span className="text-teal-700 font-800">Token 1</span>
+              Select joint hotspots to record Swollen and Tender joint counts.
             </p>
           </div>
 

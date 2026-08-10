@@ -15,16 +15,16 @@ import {
 import { RheumatDiagnosisFormState } from "../types/rheumatDiagnosis"
 import { fetchRumatDiagnosis, saveRumatDiagnosis } from "../services/api"
 
-const INITIAL_STATE: RheumatDiagnosisFormState = {
+const CLEAN_INITIAL_STATE: RheumatDiagnosisFormState = {
   msm: {
-    years: "1",
-    months: "6",
-    days: "0",
-    activeMSM: true,
-    symmetricity: true,
-    jointInvolvement: { hand_right: true, hand_left: true, wrist_right: true, wrist_left: true, knee_right: true },
-    limitationMovement: { wrist_right: true, wrist_left: true },
-    patternAdditive: true,
+    years: "",
+    months: "",
+    days: "",
+    activeMSM: false,
+    symmetricity: false,
+    jointInvolvement: {},
+    limitationMovement: {},
+    patternAdditive: false,
     patternRelapsing: false,
     patternEpisodic: false,
   },
@@ -40,14 +40,14 @@ const INITIAL_STATE: RheumatDiagnosisFormState = {
     areaButtock: false,
   },
   weakness: { active: false, description: "" },
-  dermatological: { raynauds: true, dry_mouth: true },
-  ophthalmological: { dry_eyes: true },
-  constitutional: { weightLoss: true, weightGain: false, fever: false },
+  dermatological: {},
+  ophthalmological: {},
+  constitutional: { weightLoss: false, weightGain: false, fever: false },
   allergy: { active: false, drugsDescription: "", otherDescription: "" },
   systems: { cardiorespiratory: "", gastrointestinal: "", cns: "", respiratory: "" },
-  pastHistory: { dm: false, htn: true },
+  pastHistory: {},
   obstetricHistory: { active: false, description: "" },
-  personalHistory: { appetite_normal: true, sleep_disturbed: true },
+  personalHistory: {},
   spineExam: { active: false, restrictedMovement: false, description: "" },
   summaryNote: "",
   diseaseName: "Rheumatoid Arthritis",
@@ -56,8 +56,8 @@ const INITIAL_STATE: RheumatDiagnosisFormState = {
 
 export function RheumatDiagnosisPage({ onBackToDashboard }: { onBackToDashboard: () => void }) {
   const [language, setLanguage] = useState("en-IN")
-  const [form, setForm] = useState<RheumatDiagnosisFormState>(INITIAL_STATE)
-  const [openAccordion, setOpenAccordion] = useState<number | null>(0) // Open category 0 by default
+  const [form, setForm] = useState<RheumatDiagnosisFormState>(CLEAN_INITIAL_STATE)
+  const [openAccordion, setOpenAccordion] = useState<number | null>(0)
   const [isGenerating, setIsGenerating] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
 
@@ -106,12 +106,11 @@ export function RheumatDiagnosisPage({ onBackToDashboard }: { onBackToDashboard:
       .join(", ")
 
     const generatedText = `PATIENT CLINICAL SUMMARY NOTE:
-Patient presents with active Musculoskeletal Manifestations of 1 yr 6 mo duration.
+Patient presents with active Musculoskeletal Manifestations.
 Symmetric joint involvement noted in: ${activeJoints || "Hands and Wrists"}.
-Pattern: Additive. Limitation of Movement observed in Bilateral Wrists.
-Associated Dermatological Findings: ${activeDerm || "Raynaud's Phenomenon, Dry Mouth"}.
-Ophthalmological: Dry Eyes noted. Constitutional: Weight Loss reported.
-Assessment indicates Active Rheumatoid Arthritis with moderate inflammatory activity.`
+Pattern: Additive.
+Associated Dermatological Findings: ${activeDerm || "None reported"}.
+Assessment indicates ${form.diseaseName} (${form.diseaseState}).`
 
     let currentLength = 0
     const interval = setInterval(() => {
@@ -172,26 +171,6 @@ Assessment indicates Active Rheumatoid Arthritis with moderate inflammatory acti
           >
             ⬅️ Back to Dashboard
           </button>
-        </div>
-
-        {/* Patient Summary Header Card */}
-        <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs font-600">
-          <div>
-            <span className="text-slate-400 block font-500">Patient Name</span>
-            <span className="text-slate-800 font-800 text-sm">Alpa Jaiswar</span>
-          </div>
-          <div>
-            <span className="text-slate-400 block font-500">Sex / Age</span>
-            <span className="text-slate-800 font-800 text-sm">Female / 42 Yrs.</span>
-          </div>
-          <div>
-            <span className="text-slate-400 block font-500">Appointment</span>
-            <span className="text-teal-700 font-800 text-sm">Token 1 (RL-26-00011)</span>
-          </div>
-          <div>
-            <span className="text-slate-400 block font-500">Consulting Doctor</span>
-            <span className="text-slate-800 font-800 text-sm">Dr. Shweta Gupta</span>
-          </div>
         </div>
 
         {saveSuccess && (

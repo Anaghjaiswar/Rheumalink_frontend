@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react"
 import { DoctorTab, PatientSummary } from "../types/doctor"
-import { ATTENDING, ATTENDED } from "../data/doctorData"
 import { DoctorTopNav } from "../components/doctor/DoctorTopNav"
 import { PatientSummaryPanel } from "../components/doctor/PatientSummaryPanel"
 import { PatientTable } from "../components/doctor/PatientTable"
@@ -38,9 +37,9 @@ export function DoctorDeskPage({
   const [slideOver, setSlideOver] = useState<PatientSummary | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
 
-  const [attendingList, setAttendingList] = useState<PatientSummary[]>(ATTENDING)
-  const [attendedList, setAttendedList] = useState<PatientSummary[]>(ATTENDED)
-  const [counts, setCounts] = useState({ waiting: 5, attending: 1, attended: 2, total_today: 8 })
+  const [attendingList, setAttendingList] = useState<any[]>([])
+  const [attendedList, setAttendedList] = useState<any[]>([])
+  const [counts, setCounts] = useState({ waiting: 0, attending: 0, attended: 0, total_today: 0 })
 
   useEffect(() => {
     fetchDoctorDashboard()

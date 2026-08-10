@@ -65,7 +65,7 @@ export async function loginWithCredentials(email: string, password: string): Pro
       }
     }
 
-    // 2. Fallback to SimpleJWT token endpoint
+    // 2. SimpleJWT token endpoint fallback
     const jwtResponse = await fetch(`${BASE_URL}/api/token/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -84,18 +84,8 @@ export async function loginWithCredentials(email: string, password: string): Pro
       return { ok: true, user: userObj }
     }
 
-    const errText = await response.text().catch(() => "")
-    return { ok: false, error: errText.includes("Invalid") ? "Invalid email or password." : "Authentication failed." }
+    return { ok: false, error: "Invalid email or password. Authentication failed." }
   } catch (err: any) {
-    // Demo fallback for offline frontend testing
-    const demoRole = email.includes("compounder") ? "COMPOUNDER" : "DOCTOR"
-    const demoUser: UserProfile = {
-      id: 99,
-      email: email || "doctor@rheumalink.com",
-      role: demoRole,
-      full_name: demoRole === "DOCTOR" ? "Dr. Shweta Gupta" : "Compounder Admin",
-    }
-    saveAuthSession("demo_jwt_token_12345", demoUser)
-    return { ok: true, user: demoUser }
+    return { ok: false, error: "Unable to connect to authentication server. Please check backend network connection." }
   }
 }

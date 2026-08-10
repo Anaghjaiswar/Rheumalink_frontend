@@ -100,7 +100,7 @@ export function LoginPage({ onLoginSuccess }: { onLoginSuccess: (user: UserProfi
               required
               value={email}
               onChange={e => setEmail(e.target.value)}
-              placeholder={selectedRole === "DOCTOR" ? "doctor@rheumalink.com" : "compounder@rheumalink.com"}
+              placeholder={selectedRole === "DOCTOR" ? "shweta78@gmail.com" : "compounder1@gmail.com"}
               className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 bg-slate-50 text-slate-800 text-sm font-600 focus:outline-none focus:border-teal-500 focus:bg-white transition-all placeholder:text-slate-400"
             />
           </div>
