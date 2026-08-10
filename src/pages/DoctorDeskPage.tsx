@@ -22,9 +22,11 @@ function SectionTitle({ icon, title }: { icon: string; title: string }) {
 export function DoctorDeskPage({
   onSwitchCompounder,
   onOpenJointChart,
+  onOpenUploadLabReport,
 }: {
   onSwitchCompounder: () => void
   onOpenJointChart?: () => void
+  onOpenUploadLabReport?: () => void
 }) {
   const [language, setLanguage] = useState("English")
   const [activeTab, setActiveTab] = useState<DoctorTab>("consultation")
@@ -46,7 +48,10 @@ export function DoctorDeskPage({
             <h1 className="text-2xl sm:text-3xl font-800 text-slate-800">🩺 Doctor Desk</h1>
             <p className="text-slate-500 font-500 text-sm mt-0.5">Consultations, prescriptions, and patient management</p>
           </div>
-          <button className="flex items-center gap-2 px-5 py-3 bg-teal-600 hover:bg-teal-700 active:scale-95 text-white font-700 text-sm rounded-xl shadow-sm transition-all">
+          <button
+            onClick={onOpenUploadLabReport}
+            className="flex items-center gap-2 px-5 py-3 bg-teal-600 hover:bg-teal-700 active:scale-95 text-white font-700 text-sm rounded-xl shadow-sm transition-all cursor-pointer"
+          >
             <UploadIcon /> <span className="hidden sm:inline">Upload Patient Lab Reports</span><span className="sm:hidden">Upload</span>
           </button>
         </div>

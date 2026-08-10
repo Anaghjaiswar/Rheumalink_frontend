@@ -7,6 +7,15 @@ export const samplePatients = [
   { name: "Jayesh Patel", contact: "+91 91234 56789", internalFile: "RL-26-00014", externalFile: "—", type: "Free" },
 ]
 
+export const ATTENDING_TODAY = [
+  { token: "Token 1", name: "Alpa Jaiswar", file: "RL-26-00011", status: "In Consultation" },
+]
+
+export const ATTENDED_TODAY = [
+  { token: "Token 2", name: "Ramesh Shetty", file: "RL-26-00012", status: "Attended" },
+  { token: "Token 3", name: "Meena Kulkarni", file: "RL-26-00013", status: "Attended" },
+]
+
 export const BLOOD_GROUPS = ["A+", "A−", "B+", "B−", "AB+", "AB−", "O+", "O−"]
 
 export const COMORBIDITIES = [
