@@ -5,10 +5,16 @@ import { JOINT_SPOTS, CIRCLE_IMAGES } from "../../data/jointChartData"
 export function JointChartCanvas({
   jointStates,
   onToggleJoint,
+  onJointClick,
 }: {
   jointStates: Record<string, JointState>
-  onToggleJoint: (cbelId: string, prefix: number) => void
+  onToggleJoint?: (cbelId: string, prefix: number) => void
+  onJointClick?: (cbelId: string, prefix: number) => void
 }) {
+  const handleToggle = (cbelId: string, prefix: number) => {
+    if (onToggleJoint) onToggleJoint(cbelId, prefix)
+    else if (onJointClick) onJointClick(cbelId, prefix)
+  }
   const getBackgroundImage = (cbelId: string, prefix: number) => {
     const state = jointStates[cbelId] || "nopain"
     if (state === "red") return CIRCLE_IMAGES.red(prefix)
@@ -75,7 +81,7 @@ export function JointChartCanvas({
             <div
               key={spot.id}
               id={spot.id}
-              onClick={() => onToggleJoint(spot.cbelId, spot.prefix)}
+              onClick={() => handleToggle(spot.cbelId, spot.prefix)}
               title={`${spot.label}: ${state}`}
               style={{
                 position: "absolute",

@@ -1,6 +1,7 @@
 import React from "react"
 import { HeartPulseIcon, GlobeIcon, ChevronIcon, LogoutIcon } from "../icons"
 import { VOICE_LANGUAGES } from "../../data/compounderData"
+import { getStoredCompounderUser } from "../../services/auth"
 
 export function TopNav({
   language,
@@ -13,6 +14,9 @@ export function TopNav({
   onSwitchDoctor: () => void
   onLogout?: () => void
 }) {
+  const compounderUser = getStoredCompounderUser()
+  const compounderName = compounderUser?.full_name || "Compounder"
+
   return (
     <nav className="sticky top-0 z-50 bg-slate-900 border-b border-slate-800 shadow-lg">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center gap-4">
@@ -27,7 +31,7 @@ export function TopNav({
         {/* Greeting */}
         <div className="flex-1 flex items-center sm:ml-4">
           <p className="text-slate-300 font-600 text-base">
-            Hello, <span className="text-teal-400 font-800">Sneha</span> 👋
+            Hello, <span className="text-teal-400 font-800">{compounderName}</span> 👋
           </p>
         </div>
 

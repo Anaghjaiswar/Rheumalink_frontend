@@ -4,22 +4,32 @@ import { Card } from "../ui/Card"
 import { PrimaryBtn, SecondaryBtn, OutlineBtn } from "../ui/Buttons"
 
 export function JointChartControls({
-  noPainCount,
-  tenderCount,
-  swollenCount,
-  recentCharts,
+  noPainCount = 0,
+  tenderCount = 0,
+  swollenCount = 0,
+  counts,
+  recentCharts = [],
   onSave,
+  onSaveAssessment,
   onReset,
   onBack,
+  onBulkAction,
 }: {
-  noPainCount: number
-  tenderCount: number
-  swollenCount: number
-  recentCharts: JointChartRecord[]
-  onSave: () => void
-  onReset: () => void
-  onBack: () => void
+  noPainCount?: number
+  tenderCount?: number
+  swollenCount?: number
+  counts?: { swollen: number; tender: number; noPain?: number }
+  recentCharts?: JointChartRecord[]
+  onSave?: () => void
+  onSaveAssessment?: () => void
+  onReset?: () => void
+  onBack?: () => void
+  onBulkAction?: (action: "allnopain" | "allswollen" | "alltender") => void
 }) {
+  const finalSwollen = counts ? counts.swollen : swollenCount
+  const finalTender = counts ? counts.tender : tenderCount
+  const finalNoPain = counts && counts.noPain !== undefined ? counts.noPain : (44 - finalSwollen - finalTender)
+  const handleSaveClick = onSaveAssessment || onSave || (() => {})
   return (
     <div className="space-y-5 sticky top-20">
       {/* Assessment Controls Card */}

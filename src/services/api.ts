@@ -28,9 +28,13 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   return response.json()
 }
 
-// ── CLINIC SETTINGS API (CACHED FROM REDIS DB) ──
+// ── CLINIC SETTINGS & DOCTORS LIST API ──
 export async function fetchClinicSettings() {
   return request<{ ok: boolean; name: string; contact_email: string; contact_number: string; address: string; logo_url: string | null }>("/api/v1/clinic/settings/")
+}
+
+export async function fetchDoctorsList() {
+  return request<{ ok: boolean; doctors: any[] }>("/api/v1/doctors/")
 }
 
 // ── COMPOUNDER API ──
@@ -53,98 +57,92 @@ export async function createAppointment(payload: any) {
   })
 }
 
+export async function updateAppointmentStatus(appointmentId: number | string, payload: { status?: string; doctor_id?: number | string }) {
+  return request<any>(`/api/v1/compounder/appointment/${appointmentId}/update/`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  })
+}
+
 // ── DOCTOR API ──
-export async function fetchDoctorDashboard(doctorId?: string) {
-  const query = doctorId ? `?doctor_id=${encodeURIComponent(doctorId)}` : ""
+export async function fetchDoctorDashboard(doctorId?: number) {
+  const query = doctorId ? `?doctor_id=${doctorId}` : ""
   return request<any>(`/api/v1/doctor/dashboard/${query}`)
 }
 
-export async function saveConsultation(appointmentId: string | number, payload: any) {
+export async function saveConsultation(appointmentId: number | string, payload: any) {
   return request<any>(`/api/v1/doctor/consultation/${appointmentId}/save/`, {
     method: "POST",
     body: JSON.stringify(payload),
   })
 }
 
-export async function saveDiagnosis(appointmentId: string | number, payload: any) {
+export async function saveDiagnosis(appointmentId: number | string, payload: any) {
   return request<any>(`/api/v1/doctor/diagnosis/${appointmentId}/save/`, {
     method: "POST",
     body: JSON.stringify(payload),
   })
 }
 
-// ── VITALS & MEDICAL INFO API ──
-export async function fetchVitals(appointmentId: string | number) {
-  return request<any>(`/api/v1/vitals/${appointmentId}/`)
-}
-
-export async function saveVitals(appointmentId: string | number, payload: any) {
-  return request<any>(`/api/v1/vitals/${appointmentId}/save/`, {
-    method: "POST",
-    body: JSON.stringify(payload),
-  })
-}
-
-export async function fetchMedicalInfo(patientId: string | number) {
-  return request<any>(`/api/v1/medical-info/${patientId}/`)
-}
-
-export async function saveMedicalInfo(patientId: string | number, payload: any) {
-  return request<any>(`/api/v1/medical-info/${patientId}/save/`, {
-    method: "POST",
-    body: JSON.stringify(payload),
-  })
-}
-
-// ── JOINT ASSESSMENT CHART API ──
-export async function fetchJointChart(appointmentId: string | number) {
+// ── JOINT CHART API ──
+export async function fetchJointChart(appointmentId: number | string) {
   return request<any>(`/api/v1/joint-chart/${appointmentId}/`)
 }
 
-export async function saveJointChart(appointmentId: string | number, jointStates: Record<string, string>) {
+export async function saveJointChart(appointmentId: number | string, jointStates: Record<string, string>) {
   return request<any>(`/api/v1/joint-chart/${appointmentId}/save/`, {
     method: "POST",
-    body: JSON.stringify(jointStates),
+    body: JSON.stringify({ joint_states: jointStates }),
   })
 }
 
-// ── RHEUMAT DIAGNOSIS & SYMPTOMS BOOK API ──
-export async function fetchRumatDiagnosis(appointmentId: string | number) {
+// ── RHEUMAT DIAGNOSIS API ──
+export async function fetchRumatDiagnosis(appointmentId: number | string) {
   return request<any>(`/api/v1/rumat-diagnosis/${appointmentId}/`)
 }
 
-export async function saveRumatDiagnosis(appointmentId: string | number, payload: any) {
+export async function saveRumatDiagnosis(appointmentId: number | string, payload: any) {
   return request<any>(`/api/v1/rumat-diagnosis/${appointmentId}/save/`, {
     method: "POST",
     body: JSON.stringify(payload),
   })
 }
 
-// ── ANALYTICS & AUTOCOMPLETE ──
-export async function fetchDAS28Score(appointmentId: string | number) {
-  return request<any>(`/api/v1/das28/${appointmentId}/`)
+// ── VITALS & MEDICAL INFO API ──
+export async function fetchPatientAppointments(patientId: number | string) {
+  return request<any>(`/api/v1/patient/${patientId}/appointments/`)
 }
 
-export async function autosuggestMedicine(query: string) {
-  return request<any>(`/api/v1/autosuggest/medicine/?q=${encodeURIComponent(query)}`)
+export async function fetchVitals(appointmentId: number | string) {
+  return request<any>(`/api/v1/vitals/${appointmentId}/`)
 }
 
-export async function autosuggestLabTest(query: string) {
-  return request<any>(`/api/v1/autosuggest/labtest/?q=${encodeURIComponent(query)}`)
-}
-
-// ── LAB REPORT API ──
-export async function uploadLabReportTemp(formData: FormData) {
-  const url = `${BASE_URL}/api/lab-report/upload-temp/`
-  const token = getStoredToken()
-  const headers: Record<string, string> = {}
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`
-  }
-
-  const response = await fetch(url, {
+export async function saveVitals(appointmentId: number | string, payload: any) {
+  return request<any>(`/api/v1/vitals/${appointmentId}/save/`, {
     method: "POST",
-    headers,
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function fetchMedicalInfo(patientId: number | string) {
+  return request<any>(`/api/v1/medical-info/${patientId}/`)
+}
+
+export async function saveMedicalInfo(patientId: number | string, payload: any) {
+  return request<any>(`/api/v1/medical-info/${patientId}/save/`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  })
+}
+
+// ── LAB REPORT UPLOADER API ──
+export async function uploadLabReportTemp(file: File) {
+  const formData = new FormData()
+  formData.append("file", file)
+  const token = getStoredToken()
+  const response = await fetch(`${BASE_URL}/api/lab-report/upload-temp/`, {
+    method: "POST",
+    headers: token ? { "Authorization": `Bearer ${token}` } : {},
     body: formData,
   })
   return response.json()
@@ -154,15 +152,9 @@ export async function pollLabReportTask(taskId: string) {
   return request<any>(`/api/lab-report/task-status/${taskId}/`)
 }
 
-export async function saveExtractedLabData(reportId: string | number, testData: any) {
+export async function saveExtractedLabData(reportId: number | string, payload: any) {
   return request<any>(`/api/lab-report/save/${reportId}/`, {
     method: "POST",
-    body: JSON.stringify({ test_data: testData }),
-  })
-}
-
-export async function sendPrescriptionWhatsapp(prescriptionId: string | number) {
-  return request<any>(`/api/v1/prescription/${prescriptionId}/send/`, {
-    method: "POST",
+    body: JSON.stringify(payload),
   })
 }

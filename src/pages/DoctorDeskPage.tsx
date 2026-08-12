@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react"
-import { DoctorTab, PatientSummary } from "../types/doctor"
+import { DoctorTab } from "../types/doctor"
 import { DoctorTopNav } from "../components/doctor/DoctorTopNav"
 import { PatientSummaryPanel } from "../components/doctor/PatientSummaryPanel"
 import { PatientTable } from "../components/doctor/PatientTable"
@@ -8,7 +8,7 @@ import { DiagnosisBookForm } from "../components/doctor/DiagnosisBookForm"
 import {
   UploadIcon, SearchIcon, ClockIcon, StethoscopeIcon, CheckCircleIcon, CalendarIcon
 } from "../components/icons"
-import { fetchDoctorDashboard } from "../services/api"
+import { fetchDoctorDashboard, fetchCompounderDashboard } from "../services/api"
 
 function SectionTitle({ icon, title }: { icon: string; title: string }) {
   return (
@@ -34,11 +34,21 @@ export function DoctorDeskPage({
 }) {
   const [language, setLanguage] = useState("English")
   const [activeTab, setActiveTab] = useState<DoctorTab>("consultation")
-  const [slideOver, setSlideOver] = useState<PatientSummary | null>(null)
+  
+  // Live SlideOver drawer state for Medical Summary
+  const [slideOverPatient, setSlideOverPatient] = useState<any | null>(null)
+  
   const [searchQuery, setSearchQuery] = useState("")
+  const [searchResults, setSearchResults] = useState<any[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+
+  // Active selected patient & appointment across doctor forms
+  const [selectedPatient, setSelectedPatient] = useState<any | null>(null)
+  const [selectedAppointment, setSelectedAppointment] = useState<any | null>(null)
 
   const [attendingList, setAttendingList] = useState<any[]>([])
   const [attendedList, setAttendedList] = useState<any[]>([])
+  const [waitingList, setWaitingList] = useState<any[]>([])
   const [counts, setCounts] = useState({ waiting: 0, attending: 0, attended: 0, total_today: 0 })
 
   useEffect(() => {
@@ -47,15 +57,52 @@ export function DoctorDeskPage({
         if (res.ok) {
           if (res.attending) setAttendingList(res.attending)
           if (res.attended) setAttendedList(res.attended)
+          if (res.waiting) setWaitingList(res.waiting)
           if (res.counts) setCounts(res.counts)
         }
       })
       .catch(() => {})
   }, [])
 
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!searchQuery.trim()) {
+      setSearchResults([])
+      return
+    }
+    setIsSearching(true)
+    fetchCompounderDashboard(searchQuery)
+      .then(res => {
+        setIsSearching(false)
+        if (res.ok && res.search_results) {
+          setSearchResults(res.search_results)
+        }
+      })
+      .catch(() => setIsSearching(false))
+  }
+
+  const handleStartConsultation = (p: any) => {
+    setSelectedAppointment(p)
+    setSelectedPatient({ id: p.patient_id || p.id, name: p.patient_name || p.name, internal_file: p.file || p.internal_file })
+    setActiveTab("consultation")
+    const el = document.getElementById("doctor-quick-actions")
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth" })
+    }
+  }
+
   return (
     <div className="min-h-screen bg-sky-50 font-sans">
-      {slideOver && <PatientSummaryPanel patient={slideOver} onClose={() => setSlideOver(null)} />}
+      {slideOverPatient && (
+        <PatientSummaryPanel
+          patientId={slideOverPatient.patient_id || slideOverPatient.id}
+          appointmentId={slideOverPatient.id}
+          patientName={slideOverPatient.patient_name || slideOverPatient.name}
+          fileNumber={slideOverPatient.file || slideOverPatient.internal_file}
+          externalFile={slideOverPatient.external_file}
+          onClose={() => setSlideOverPatient(null)}
+        />
+      )}
 
       <DoctorTopNav
         language={language}
@@ -81,30 +128,91 @@ export function DoctorDeskPage({
           </button>
         </div>
 
-        {/* ── SEARCH ── */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 flex flex-col gap-3">
+        {/* ── SEARCH BAR & SEARCH RESULTS ── */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 flex flex-col gap-4">
           <p className="font-800 text-slate-700 text-base">🔍 Patient &amp; File Search</p>
-          <div className="flex gap-2">
+          
+          <form onSubmit={handleSearchSubmit} className="flex gap-2">
             <div className="relative flex-1">
               <input
                 type="text"
-                placeholder="Search by name, contact, or file number…"
+                placeholder="Search by patient name, contact number, or file number…"
                 value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
+                onChange={e => {
+                  setSearchQuery(e.target.value)
+                  if (!e.target.value.trim()) setSearchResults([])
+                }}
                 className="w-full px-4 py-3 pl-10 rounded-xl border-2 border-slate-200 bg-slate-50 text-slate-800 text-base font-500 focus:outline-none focus:border-teal-400 focus:bg-white transition-all placeholder:text-slate-400"
               />
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"><SearchIcon /></span>
             </div>
-            <button className="px-4 py-3 rounded-xl bg-teal-600 hover:bg-teal-700 text-white transition-colors flex items-center">
-              <SearchIcon />
+            <button
+              type="submit"
+              disabled={isSearching}
+              className="px-6 py-3 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-700 transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-70"
+            >
+              {isSearching ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <SearchIcon />}
+              Search
             </button>
-          </div>
+          </form>
+
+          {/* Active Selected Patient Banner */}
+          {(selectedPatient || selectedAppointment) && (
+            <div className="p-3.5 rounded-xl bg-teal-50 border border-teal-200 text-teal-800 text-xs font-700 flex items-center justify-between">
+              <span>🎯 Active Patient Selected: <strong>{selectedPatient?.name || selectedAppointment?.patient_name}</strong> ({selectedPatient?.internal_file || selectedAppointment?.file})</span>
+              <button onClick={() => { setSelectedPatient(null); setSelectedAppointment(null); }} className="text-teal-600 hover:underline cursor-pointer">
+                Clear Selection
+              </button>
+            </div>
+          )}
+
+          {/* Render Search Results List with Dual Buttons */}
+          {searchResults.length > 0 && (
+            <div className="mt-2 border-t border-slate-100 pt-4 space-y-2">
+              <div className="flex items-center justify-between text-xs font-700 text-slate-500 uppercase tracking-wide">
+                <span>Matching Patients ({searchResults.length})</span>
+                <button onClick={() => { setSearchQuery(""); setSearchResults([]); }} className="text-teal-600 hover:underline cursor-pointer">
+                  Clear
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {searchResults.map(p => (
+                  <div
+                    key={p.id}
+                    className="p-4 rounded-xl bg-slate-50 border border-slate-200 hover:border-teal-300 hover:bg-teal-50/40 transition-all flex flex-col justify-between gap-3 shadow-xs"
+                  >
+                    <div>
+                      <p className="font-800 text-slate-800 text-sm">{p.name}</p>
+                      <p className="text-xs text-slate-500 font-600 mt-0.5">📞 {p.contact || "No Contact"}</p>
+                      <p className="text-xs text-teal-700 font-700 mt-1">📁 File: {p.internal_file}</p>
+                    </div>
+
+                    <div className="flex gap-2 pt-1 border-t border-slate-200/60">
+                      <button
+                        onClick={() => setSlideOverPatient(p)}
+                        className="flex-1 py-1.5 px-2 rounded-lg bg-white border border-slate-200 text-slate-700 text-xs font-700 hover:bg-slate-100 transition-colors cursor-pointer text-center"
+                      >
+                        Medical Summary
+                      </button>
+                      <button
+                        onClick={() => handleStartConsultation(p)}
+                        className="flex-1 py-1.5 px-2 rounded-lg bg-teal-600 text-white text-xs font-700 hover:bg-teal-700 transition-colors cursor-pointer text-center shadow-2xs"
+                      >
+                        ⚡ Select Patient
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* ── TODAY'S SUMMARY STATS ── */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        {/* ── STAT TILES ── */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[
-            { label: "Waiting", value: counts.waiting, icon: <ClockIcon />, bg: "bg-slate-100", text: "text-slate-600", iconBg: "bg-slate-200" },
+            { label: "Waiting Queue", value: counts.waiting, icon: <ClockIcon />, bg: "bg-slate-100", text: "text-slate-600", iconBg: "bg-slate-200" },
             { label: "Attending", value: counts.attending, icon: <StethoscopeIcon />, bg: "bg-amber-50", text: "text-amber-700", iconBg: "bg-amber-100" },
             { label: "Attended", value: counts.attended, icon: <CheckCircleIcon />, bg: "bg-emerald-50", text: "text-emerald-700", iconBg: "bg-emerald-100" },
             { label: "Total Today", value: counts.total_today, icon: <CalendarIcon />, bg: "bg-sky-50", text: "text-sky-700", iconBg: "bg-sky-100" },
@@ -125,19 +233,21 @@ export function DoctorDeskPage({
             title="Attending Patients"
             patients={attendingList}
             attending={true}
-            onAction={p => setSlideOver(p)}
+            onOpenSummary={p => setSlideOverPatient(p)}
+            onStartConsultation={p => handleStartConsultation(p)}
           />
 
           <PatientTable
             title="Attended Patients"
             patients={attendedList}
             attending={false}
-            onAction={p => setSlideOver(p)}
+            onOpenSummary={p => setSlideOverPatient(p)}
+            onStartConsultation={p => handleStartConsultation(p)}
           />
         </div>
 
         {/* ── MAIN FORMS SECTION ── */}
-        <div>
+        <div id="doctor-quick-actions">
           <SectionTitle icon="⚡" title="Quick Actions" />
 
           {/* Tab bar & Quick Launchers */}
@@ -177,7 +287,10 @@ export function DoctorDeskPage({
               </h3>
             </div>
             {activeTab === "consultation" ? (
-              <ConsultationForm />
+              <ConsultationForm
+                selectedPatient={selectedPatient}
+                selectedAppointment={selectedAppointment}
+              />
             ) : (
               <DiagnosisBookForm
                 onOpenJointChart={onOpenJointChart}

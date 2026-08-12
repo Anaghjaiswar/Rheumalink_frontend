@@ -1,4 +1,4 @@
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { PatientSearchResult, AppointmentOption, LabTestRow } from "../types/labReport"
 import { DoctorTopNav } from "../components/doctor/DoctorTopNav"
 import { PatientSearchSection } from "../components/labReport/PatientSearchSection"
@@ -6,22 +6,12 @@ import { AppointmentTimeline } from "../components/labReport/AppointmentTimeline
 import { UploadDropzone } from "../components/labReport/UploadDropzone"
 import { ExtractedResultsTable } from "../components/labReport/ExtractedResultsTable"
 import { Card } from "../components/ui/Card"
-
-const MOCK_APPOINTMENTS: AppointmentOption[] = [
-  { id: "101", date: "08 Aug 2026", doctor: "Dr. Shweta Gupta" },
-  { id: "102", date: "12 Jul 2026", doctor: "Dr. Arvind Mehta" },
-]
-
-const DEFAULT_EXTRACTED_DATA: LabTestRow[] = [
-  { id: "1", name: "Hemoglobin (Hb)", value: "12.8", unit: "g/dL", ref: "12.0 - 15.5" },
-  { id: "2", name: "ESR (Erythrocyte Sedimentation Rate)", value: "42", unit: "mm/hr", ref: "0 - 20" },
-  { id: "3", name: "C-Reactive Protein (CRP)", value: "18.5", unit: "mg/L", ref: "0 - 5.0" },
-  { id: "4", name: "Rheumatoid Factor (RF) Quant", value: "65.4", unit: "IU/mL", ref: "0 - 14.0" },
-]
+import { fetchDoctorDashboard, uploadLabReportTemp, pollLabReportTask, saveExtractedLabData } from "../services/api"
 
 export function UploadLabReportPage({ onBackToDashboard }: { onBackToDashboard: () => void }) {
   const [language, setLanguage] = useState("en-IN")
   const [selectedPatient, setSelectedPatient] = useState<PatientSearchResult | null>(null)
+  const [dbAppointments, setDbAppointments] = useState<AppointmentOption[]>([])
   const [selectedApptId, setSelectedApptId] = useState<string | null>(null)
 
   const [reportName, setReportName] = useState("CBC & Inflammatory Markers")
@@ -30,29 +20,98 @@ export function UploadLabReportPage({ onBackToDashboard }: { onBackToDashboard: 
 
   const [isProcessing, setIsProcessing] = useState(false)
   const [showSplitScreen, setShowSplitScreen] = useState(false)
-  const [testRows, setTestRows] = useState<LabTestRow[]>(DEFAULT_EXTRACTED_DATA)
+  const [testRows, setTestRows] = useState<LabTestRow[]>([])
+  const [reportId, setReportId] = useState<number | null>(null)
+
   const [saveSuccess, setSaveSuccess] = useState(false)
+  const [errorMsg, setErrorMsg] = useState("")
+
+  // Fetch real appointments when patient is selected
+  useEffect(() => {
+    if (selectedPatient) {
+      fetchDoctorDashboard()
+        .then(res => {
+          if (res.ok) {
+            const list = [...(res.attending || []), ...(res.attended || []), ...(res.waiting || [])]
+            const apptOptions: AppointmentOption[] = list.map((a: any) => ({
+              id: String(a.id),
+              date: a.appointment_date || "Today",
+              doctor: a.doctor || "Unassigned Doctor",
+            }))
+            setDbAppointments(apptOptions)
+          }
+        })
+        .catch(() => {})
+    } else {
+      setDbAppointments([])
+    }
+  }, [selectedPatient])
 
   const handleResetPatient = () => {
     setSelectedPatient(null)
     setSelectedApptId(null)
     setSelectedFile(null)
     setShowSplitScreen(false)
+    setTestRows([])
+    setReportId(null)
+    setErrorMsg("")
   }
 
-  const handleTriggerAI = () => {
+  const handleTriggerAI = async () => {
     if (!selectedFile || !selectedPatient) {
-      alert("Please select a patient and upload a valid PDF file.")
+      setErrorMsg("Please select a patient and upload a valid PDF file.")
       return
     }
 
     setShowSplitScreen(true)
     setIsProcessing(true)
+    setErrorMsg("")
 
-    // Simulate Docling / Groq AI Extraction processing delay
-    setTimeout(() => {
+    try {
+      const formData = new FormData()
+      formData.append("file", selectedFile)
+      formData.append("patient_id", selectedPatient.id)
+      if (selectedApptId) {
+        formData.append("appointment_id", selectedApptId)
+      }
+      formData.append("report_name", reportName)
+      formData.append("test_date", testDate)
+
+      const uploadRes = await uploadLabReportTemp(formData)
+
+      if (uploadRes.status === "success" && uploadRes.task_id) {
+        setReportId(uploadRes.report_id)
+        
+        // Poll background Celery task
+        const interval = setInterval(async () => {
+          const statusRes = await pollLabReportTask(uploadRes.task_id)
+          if (statusRes.state === "SUCCESS") {
+            clearInterval(interval)
+            setIsProcessing(false)
+            if (statusRes.result && statusRes.result.test_data) {
+              const rows: LabTestRow[] = statusRes.result.test_data.map((td: any, idx: number) => ({
+                id: String(idx + 1),
+                name: td.test_name || td.name || "",
+                value: td.value || "",
+                unit: td.unit || "",
+                ref: td.reference_range || td.ref || "",
+              }))
+              setTestRows(rows)
+            }
+          } else if (statusRes.state === "FAILURE") {
+            clearInterval(interval)
+            setIsProcessing(false)
+            setErrorMsg("AI extraction failed: " + (statusRes.error || "Processing error"))
+          }
+        }, 2000)
+      } else {
+        setIsProcessing(false)
+        setErrorMsg(uploadRes.error || "Failed to trigger lab report upload.")
+      }
+    } catch (err: any) {
       setIsProcessing(false)
-    }, 2500)
+      setErrorMsg(err.message || "Error uploading lab report.")
+    }
   }
 
   const handleUpdateRow = (id: string, field: keyof LabTestRow, val: string) => {
@@ -68,12 +127,30 @@ export function UploadLabReportPage({ onBackToDashboard }: { onBackToDashboard: 
     setTestRows(prev => prev.filter(r => r.id !== id))
   }
 
-  const handleSaveVerified = () => {
-    setSaveSuccess(true)
-    setTimeout(() => {
-      setSaveSuccess(false)
-      onBackToDashboard()
-    }, 2000)
+  const handleSaveVerified = async () => {
+    if (!reportId) {
+      setSaveSuccess(true)
+      setTimeout(() => {
+        setSaveSuccess(false)
+        onBackToDashboard()
+      }, 2000)
+      return
+    }
+
+    try {
+      const res = await saveExtractedLabData(reportId, testRows)
+      if (res.status === "success") {
+        setSaveSuccess(true)
+        setTimeout(() => {
+          setSaveSuccess(false)
+          onBackToDashboard()
+        }, 2000)
+      } else {
+        setErrorMsg("Failed to save verified lab report.")
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || "Error saving lab report.")
+    }
   }
 
   return (
@@ -113,6 +190,12 @@ export function UploadLabReportPage({ onBackToDashboard }: { onBackToDashboard: 
           </div>
         )}
 
+        {errorMsg && (
+          <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 font-700 text-xs flex items-center gap-2 animate-fadeIn">
+            <span>⚠️</span> {errorMsg}
+          </div>
+        )}
+
         {/* Main Upload Wizard Form */}
         <Card className="p-6 space-y-7">
           {/* Step 1: Patient Search */}
@@ -125,7 +208,7 @@ export function UploadLabReportPage({ onBackToDashboard }: { onBackToDashboard: 
           {/* Step 2: Appointment Timeline */}
           {selectedPatient && (
             <AppointmentTimeline
-              appointments={MOCK_APPOINTMENTS}
+              appointments={dbAppointments}
               selectedApptId={selectedApptId}
               onSelectAppt={id => setSelectedApptId(id)}
             />

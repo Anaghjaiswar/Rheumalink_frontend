@@ -4,10 +4,11 @@ import { MicIcon } from "../icons"
 
 interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaElement> {
   noMic?: boolean
+  micButton?: boolean
   language?: string
 }
 
-export function Textarea({ noMic = false, language = "en-IN", value, onChange, className = "", ...props }: TextareaProps) {
+export function Textarea({ noMic = false, micButton, language = "en-IN", value, onChange, className = "", ...props }: TextareaProps) {
   const currentValue = typeof value === "string" ? value : ""
 
   const handleSpeechUpdate = (newText: string) => {

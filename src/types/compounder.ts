@@ -1,5 +1,6 @@
-export type ActiveTab = "register" | "appointment" | "medical"
-export type AppStatus = "to-be-attended" | "attended" | "cancelled" | "no-show"
+export type CompounderTab = "register" | "appointment" | "vitals" | "medical"
+export type ActiveTab = CompounderTab
+export type AppStatus = "T" | "I" | "A" | "C" | "N" | "to-be-attended" | "attended" | "cancelled" | "no-show"
 
 export interface VitalsState {
   weight: string

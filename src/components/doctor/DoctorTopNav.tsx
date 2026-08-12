@@ -1,6 +1,7 @@
 import React from "react"
 import { HeartPulseIcon, GlobeIcon, ChevronIcon, LogoutIcon } from "../icons"
 import { VOICE_LANGUAGES } from "../../data/doctorData"
+import { getStoredDoctorUser } from "../../services/auth"
 
 export function DoctorTopNav({
   language,
@@ -13,6 +14,9 @@ export function DoctorTopNav({
   onSwitchCompounder: () => void
   onLogout?: () => void
 }) {
+  const doctorUser = getStoredDoctorUser()
+  const doctorName = doctorUser?.full_name || "Doctor"
+
   return (
     <nav className="sticky top-0 z-40 bg-slate-900 border-b border-slate-800 shadow-lg">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center gap-4">
@@ -27,7 +31,7 @@ export function DoctorTopNav({
         {/* Greeting */}
         <div className="flex-1 flex items-center sm:ml-4">
           <p className="text-slate-300 font-600 text-base">
-            Hello, <span className="text-teal-400 font-800">Dr. Shweta Gupta</span> 👋
+            Hello, <span className="text-teal-400 font-800">{doctorName}</span> 👋
           </p>
         </div>
 

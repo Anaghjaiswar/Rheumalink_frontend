@@ -1,11 +1,11 @@
-import React, { useState } from "react"
-import { APPOINTMENTS } from "../../data/doctorData"
+import React, { useState, useEffect } from "react"
 import { Label } from "../ui/Label"
 import { Input } from "../ui/Input"
 import { Textarea } from "../ui/Textarea"
 import { Select } from "../ui/Select"
 import { PrimaryBtn, OutlineBtn } from "../ui/Buttons"
 import { Card } from "../ui/Card"
+import { fetchDoctorDashboard, saveDiagnosis } from "../../services/api"
 
 export function DiagnosisBookForm({
   onOpenJointChart,
@@ -14,21 +14,87 @@ export function DiagnosisBookForm({
   onOpenJointChart?: () => void
   onOpenRheumDiagnosis?: () => void
 }) {
-  const [appointment, setAppointment] = useState("")
+  const [appointments, setAppointments] = useState<any[]>([])
+  const [selectedApptId, setSelectedApptId] = useState("")
   const [disease, setDisease] = useState("")
   const [stage, setStage] = useState("")
   const [versionNote, setVersionNote] = useState("")
   const [das28, setDas28] = useState<string | null>(null)
-  const [saved, setSaved] = useState(false)
+  
+  const [loading, setLoading] = useState(false)
+  const [savedMsg, setSavedMsg] = useState("")
+  const [errorMsg, setErrorMsg] = useState("")
+
+  useEffect(() => {
+    fetchDoctorDashboard()
+      .then(res => {
+        if (res.ok) {
+          const list = [...(res.attending || []), ...(res.attended || []), ...(res.waiting || [])]
+          setAppointments(list)
+        }
+      })
+      .catch(() => {})
+  }, [])
+
+  const handleSave = async () => {
+    if (!selectedApptId) {
+      setErrorMsg("Please select an appointment.")
+      return
+    }
+
+    setLoading(true)
+    setErrorMsg("")
+    setSavedMsg("")
+
+    try {
+      const payload = {
+        disease_name: disease,
+        stage: stage,
+        version_note: versionNote,
+      }
+
+      const res = await saveDiagnosis(selectedApptId, payload)
+      setLoading(false)
+
+      if (res.ok) {
+        setSavedMsg(res.message || "Diagnosis record saved successfully!")
+        setTimeout(() => setSavedMsg(""), 3500)
+      } else {
+        setErrorMsg("Failed to save diagnosis record.")
+      }
+    } catch (err: any) {
+      setLoading(false)
+      setErrorMsg(err.message || "Error saving diagnosis record.")
+    }
+  }
 
   return (
     <div className="p-6 space-y-7">
+      {savedMsg && (
+        <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 font-700 text-sm">
+          ✓ {savedMsg}
+        </div>
+      )}
+      {errorMsg && (
+        <div className="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-700 font-700 text-sm">
+          ⚠️ {errorMsg}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         <div>
-          <Label>📅 Appointment</Label>
-          <Select value={appointment} onChange={e => setAppointment(e.target.value)}>
+          <Label>📅 Select Appointment (From Database)</Label>
+          <Select value={selectedApptId} onChange={e => setSelectedApptId(e.target.value)}>
             <option value="">Select appointment…</option>
-            {APPOINTMENTS.map(a => <option key={a}>{a}</option>)}
+            {appointments.length > 0 ? (
+              appointments.map(a => (
+                <option key={a.id} value={a.id}>
+                  {a.patient_name} — {a.token} ({a.status})
+                </option>
+              ))
+            ) : (
+              <option value="" disabled>No appointments found in DB for today</option>
+            )}
           </Select>
         </div>
         <div>
@@ -94,11 +160,11 @@ export function DiagnosisBookForm({
       </div>
 
       <div className="flex items-center justify-between pt-2 flex-wrap gap-3">
-        {saved && <span className="text-emerald-600 font-700">✓ Diagnosis saved! All set.</span>}
-        {!saved && <span />}
-        <PrimaryBtn onClick={() => { setSaved(true); setTimeout(() => setSaved(false), 3000) }} className="sm:min-w-[180px]" fullWidth={false}>
-          💾 Save Diagnosis
-        </PrimaryBtn>
+        <div className="flex gap-3 ml-auto">
+          <PrimaryBtn onClick={handleSave} disabled={loading} className="sm:min-w-[180px]">
+            💾 {loading ? "Saving…" : "Save Diagnosis"}
+          </PrimaryBtn>
+        </div>
       </div>
     </div>
   )

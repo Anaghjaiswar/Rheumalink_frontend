@@ -1,16 +1,8 @@
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { PatientSearchResult } from "../../types/labReport"
-import { samplePatients } from "../../data/compounderData"
 import { Input } from "../ui/Input"
 import { SearchIcon } from "../icons"
-
-const MOCK_PATIENTS: PatientSearchResult[] = samplePatients.map((p, index) => ({
-  id: String(index + 1),
-  name: p.name,
-  internalFile: p.internalFile,
-  externalFile: p.externalFile,
-  phone: p.contact,
-}))
+import { fetchCompounderDashboard } from "../../services/api"
 
 export function PatientSearchSection({
   selectedPatient,
@@ -19,21 +11,40 @@ export function PatientSearchSection({
 }: {
   selectedPatient: PatientSearchResult | null
   onSelectPatient: (p: PatientSearchResult) => void
-  onResetPatient: () => void
+  onResetPatient?: () => void
+  onClearPatient?: () => void
 }) {
+  const handleReset = onResetPatient || onClearPatient || (() => {})
   const [query, setQuery] = useState("")
   const [isOpen, setIsOpen] = useState(false)
+  const [dbPatients, setDbPatients] = useState<PatientSearchResult[]>([])
 
-  const filtered = MOCK_PATIENTS.filter(
-    p =>
-      p.name.toLowerCase().includes(query.toLowerCase()) ||
-      p.internalFile.toLowerCase().includes(query.toLowerCase()) ||
-      p.phone.includes(query)
-  )
+  useEffect(() => {
+    if (query.trim().length > 0) {
+      const timer = setTimeout(() => {
+        fetchCompounderDashboard(query)
+          .then(res => {
+            if (res.ok && res.search_results) {
+              setDbPatients(res.search_results.map((p: any) => ({
+                id: String(p.id),
+                name: p.name,
+                internalFile: p.internal_file,
+                externalFile: p.external_file || "-",
+                phone: p.contact || "-",
+              })))
+            }
+          })
+          .catch(() => {})
+      }, 300)
+      return () => clearTimeout(timer)
+    } else {
+      setDbPatients([])
+    }
+  }, [query])
 
   return (
     <div className="space-y-3">
-      <label className="block text-sm font-700 text-slate-700">1. Search &amp; Select Patient</label>
+      <label className="block text-sm font-700 text-slate-700">1. Search &amp; Select Patient (Database)</label>
 
       {!selectedPatient ? (
         <div className="relative">
@@ -56,8 +67,8 @@ export function PatientSearchSection({
           {/* Autocomplete Results Box */}
           {isOpen && query.trim().length > 0 && (
             <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-30 max-h-60 overflow-y-auto">
-              {filtered.length > 0 ? (
-                filtered.map(pat => (
+              {dbPatients.length > 0 ? (
+                dbPatients.map(pat => (
                   <div
                     key={pat.id}
                     onClick={() => {
@@ -74,7 +85,7 @@ export function PatientSearchSection({
                   </div>
                 ))
               ) : (
-                <div className="p-3 text-xs text-slate-400 italic">No patients found</div>
+                <div className="p-3 text-xs text-slate-400 italic">No patients found in database</div>
               )}
             </div>
           )}
@@ -90,7 +101,7 @@ export function PatientSearchSection({
           </div>
           <button
             type="button"
-            onClick={onResetPatient}
+            onClick={handleReset}
             className="px-3.5 py-2 bg-white hover:bg-slate-50 text-teal-700 font-700 text-xs border border-teal-300 rounded-lg transition-colors"
           >
             Change Patient

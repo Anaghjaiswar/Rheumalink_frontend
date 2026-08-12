@@ -6,11 +6,10 @@ import { CreateAppointmentForm } from "../components/compounder/CreateAppointmen
 import { MedicalHistoryForm } from "../components/compounder/MedicalHistoryForm"
 import { VitalsMiniForm } from "../components/compounder/VitalsMiniForm"
 import { PatientSummaryPanel } from "../components/doctor/PatientSummaryPanel"
-import { PatientSummary } from "../types/doctor"
 import {
-  UserPlusIcon, SearchIcon, ClockIcon, StethoscopeIcon, CheckCircleIcon, CalendarIcon, UploadIcon
+  UserPlusIcon, SearchIcon, UploadIcon, StethoscopeIcon, ClockIcon, CheckCircleIcon, CalendarIcon
 } from "../components/icons"
-import { fetchCompounderDashboard } from "../services/api"
+import { fetchCompounderDashboard, updateAppointmentStatus } from "../services/api"
 
 function TableSection({ title, count, children }: { title: string; count: number; children: React.ReactNode }) {
   return (
@@ -50,31 +49,123 @@ export function CompounderDeskPage({
   const [language, setLanguage] = useState("en-IN")
   const [activeTab, setActiveTab] = useState<CompounderTab>("register")
   const [searchQuery, setSearchQuery] = useState("")
-  const [slideOver, setSlideOver] = useState<PatientSummary | null>(null)
+  const [searchResults, setSearchResults] = useState<any[]>([])
+  const [recentPatientsList, setRecentPatientsList] = useState<any[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+  
+  // SlideOver drawer state for Medical Summary
+  const [slideOverPatient, setSlideOverPatient] = useState<any | null>(null)
+  
+  // Active selected patient across forms
+  const [selectedPatient, setSelectedPatient] = useState<any | null>(null)
 
+  const [waitingList, setWaitingList] = useState<any[]>([])
   const [attendingList, setAttendingList] = useState<any[]>([])
   const [attendedList, setAttendedList] = useState<any[]>([])
   const [counts, setCounts] = useState({ waiting: 0, attending: 0, attended: 0, total_today: 0 })
 
-  useEffect(() => {
-    fetchCompounderDashboard()
+  const loadDashboard = (q?: string) => {
+    if (!q || !q.trim()) {
+      setSearchResults([])
+    }
+    setIsSearching(true)
+    fetchCompounderDashboard(q)
       .then(res => {
+        setIsSearching(false)
         if (res.ok) {
           if (res.counts) setCounts(res.counts)
+          if (res.recent_patients) {
+            setRecentPatientsList(res.recent_patients)
+          }
+          if (q && q.trim() && res.search_results) {
+            setSearchResults(res.search_results)
+          }
           if (res.today_appointments) {
-            const attending = res.today_appointments.filter((a: any) => a.status_code === 'I')
-            const attended = res.today_appointments.filter((a: any) => a.status_code === 'A')
+            const waiting = res.today_appointments.filter((a: any) => a.status !== 'I' && a.status_code !== 'I' && a.status !== 'A' && a.status_code !== 'A')
+            const attending = res.today_appointments.filter((a: any) => a.status === 'I' || a.status_code === 'I')
+            const attended = res.today_appointments.filter((a: any) => a.status === 'A' || a.status_code === 'A')
+            setWaitingList(waiting)
             setAttendingList(attending)
             setAttendedList(attended)
           }
         }
       })
-      .catch(() => {})
+      .catch(() => setIsSearching(false))
+  }
+
+  useEffect(() => {
+    loadDashboard()
   }, [])
+
+  // Live debounced search as user types
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchResults([])
+      return
+    }
+    const timer = setTimeout(() => {
+      loadDashboard(searchQuery)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (searchQuery.trim()) {
+      loadDashboard(searchQuery)
+    }
+  }
+
+  const handleSelectPatientForAction = (patient: any, targetTab: CompounderTab = "appointment") => {
+    setSelectedPatient(patient)
+    setActiveTab(targetTab)
+    const el = document.getElementById("quick-actions-panel")
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth" })
+    }
+  }
+
+  const [pendingStatuses, setPendingStatuses] = useState<Record<number | string, string>>({})
+  const [updatingApptId, setUpdatingApptId] = useState<number | string | null>(null)
+
+  const handlePendingStatusChange = (appointmentId: number | string, status: string) => {
+    setPendingStatuses(prev => ({ ...prev, [appointmentId]: status }))
+  }
+
+  const handleConfirmSaveStatus = (appointmentId: number | string) => {
+    const targetStatus = pendingStatuses[appointmentId]
+    if (!targetStatus) return
+
+    setUpdatingApptId(appointmentId)
+    updateAppointmentStatus(appointmentId, { status: targetStatus })
+      .then(res => {
+        setUpdatingApptId(null)
+        if (res.ok) {
+          setPendingStatuses(prev => {
+            const next = { ...prev }
+            delete next[appointmentId]
+            return next
+          })
+          loadDashboard()
+        }
+      })
+      .catch(() => setUpdatingApptId(null))
+  }
+
+  const displayList = searchQuery.trim() !== "" ? searchResults : recentPatientsList
+  const displayTitle = searchQuery.trim() !== "" ? `Search Results (${searchResults.length})` : `🕒 Recently Registered Patients (${recentPatientsList.length})`
 
   return (
     <div className="min-h-screen bg-sky-50 font-sans">
-      {slideOver && <PatientSummaryPanel patient={slideOver} onClose={() => setSlideOver(null)} />}
+      {slideOverPatient && (
+        <PatientSummaryPanel
+          patientId={slideOverPatient.id}
+          patientName={slideOverPatient.name}
+          fileNumber={slideOverPatient.internal_file}
+          externalFile={slideOverPatient.external_file}
+          onClose={() => setSlideOverPatient(null)}
+        />
+      )}
 
       <TopNav
         language={language}
@@ -109,139 +200,316 @@ export function CompounderDeskPage({
           </div>
         </div>
 
-        {/* ── SEARCH BAR ── */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 flex flex-col gap-3">
+        {/* ── SEARCH PANEL ── */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 flex flex-col gap-4">
           <p className="font-800 text-slate-700 text-base">🔍 Patient &amp; File Search</p>
-          <div className="flex gap-2">
+          
+          <form onSubmit={handleSearchSubmit} className="flex gap-2">
             <div className="relative flex-1">
               <input
                 type="text"
-                placeholder="Search by name, contact, or file number…"
+                placeholder="Search by patient name (e.g. Anagh), contact number, or file number…"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 className="w-full px-4 py-3 pl-10 rounded-xl border-2 border-slate-200 bg-slate-50 text-slate-800 text-base font-500 focus:outline-none focus:border-teal-400 focus:bg-white transition-all placeholder:text-slate-400"
               />
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"><SearchIcon /></span>
             </div>
-            <button className="px-5 py-3 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-700 transition-colors flex items-center gap-2">
-              <SearchIcon /> Search
+            <button
+              type="submit"
+              disabled={isSearching}
+              className="px-6 py-3 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-700 transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-70"
+            >
+              {isSearching ? <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <SearchIcon />}
+              Search
             </button>
+          </form>
+
+          {/* Active Selected Patient Banner */}
+          {selectedPatient && (
+            <div className="p-3.5 rounded-xl bg-teal-50 border border-teal-200 text-teal-800 text-xs font-700 flex items-center justify-between">
+              <span>🎯 Active Patient Selected for Actions: <strong>{selectedPatient.name}</strong> ({selectedPatient.internal_file})</span>
+              <button onClick={() => setSelectedPatient(null)} className="text-teal-600 hover:underline cursor-pointer">
+                Clear Selection
+              </button>
+            </div>
+          )}
+
+          {/* Render Recent / Search Patients Cards */}
+          {displayList.length > 0 && (
+            <div className="mt-2 border-t border-slate-100 pt-4 space-y-2">
+              <div className="flex items-center justify-between text-xs font-700 text-slate-500 uppercase tracking-wide">
+                <span>{displayTitle}</span>
+                {searchQuery.trim() !== "" && (
+                  <button onClick={() => setSearchQuery("")} className="text-teal-600 hover:underline cursor-pointer">
+                    Clear Search
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {displayList.map(p => (
+                  <div
+                    key={p.id}
+                    className="p-4 rounded-xl bg-slate-50 border border-slate-200 hover:border-teal-300 hover:bg-teal-50/40 transition-all flex flex-col justify-between gap-3 shadow-xs"
+                  >
+                    <div>
+                      <p className="font-800 text-slate-800 text-sm">{p.name}</p>
+                      <p className="text-xs text-slate-500 font-600 mt-0.5">📞 {p.contact || "No Contact"}</p>
+                      <p className="text-xs text-teal-700 font-700 mt-1">📁 File: {p.internal_file}</p>
+                    </div>
+                    
+                    {/* Dual Action Buttons */}
+                    <div className="flex gap-2 pt-1 border-t border-slate-200/60">
+                      <button
+                        onClick={() => setSlideOverPatient(p)}
+                        className="flex-1 py-1.5 px-2 rounded-lg bg-white border border-slate-200 text-slate-700 text-xs font-700 hover:bg-slate-100 transition-colors cursor-pointer text-center"
+                      >
+                        Medical Summary
+                      </button>
+                      <button
+                        onClick={() => handleSelectPatientForAction(p, "appointment")}
+                        className="flex-1 py-1.5 px-2 rounded-lg bg-teal-600 text-white text-xs font-700 hover:bg-teal-700 transition-colors cursor-pointer text-center"
+                      >
+                        ⚡ Select Patient
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ── STAT TILES ── */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatTile label="Waiting Queue" value={counts.waiting} icon={<UserPlusIcon />} bg="bg-amber-50" text="text-amber-700" />
+          <StatTile label="Attending Now" value={counts.attending} icon={<StethoscopeIcon />} bg="bg-sky-50" text="text-sky-700" />
+          <StatTile label="Attended Today" value={counts.attended} icon={<CheckCircleIcon />} bg="bg-emerald-50" text="text-emerald-700" />
+          <StatTile label="Total Visits Today" value={counts.total_today} icon={<CalendarIcon />} bg="bg-teal-50" text="text-teal-700" />
+        </div>
+
+        {/* ── QUEUE TABLES ── */}
+        <div className="space-y-6">
+          {/* OPD / Waiting Queue Section */}
+          <TableSection title="⏳ OPD / Live Appointment Desk (To Be Attended)" count={waitingList.length}>
+            <table className="w-full text-left text-sm border-collapse">
+              <thead>
+                <tr className="border-b border-slate-100 text-slate-400 text-xs uppercase font-700 bg-slate-50/50">
+                  <th className="px-5 py-3">Token</th>
+                  <th className="px-5 py-3">Patient</th>
+                  <th className="px-5 py-3">File No.</th>
+                  <th className="px-5 py-3">Doctor</th>
+                  <th className="px-5 py-3">Status Update</th>
+                  <th className="px-5 py-3">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-600">
+                {waitingList.length > 0 ? (
+                  waitingList.map(a => (
+                    <tr key={a.id} className="hover:bg-slate-50/60 transition-colors">
+                      <td className="px-5 py-3.5 text-amber-700 font-800">{a.token || `Token ${a.token_number}`}</td>
+                      <td className="px-5 py-3.5 text-slate-800 font-700">{a.patient_name}</td>
+                      <td className="px-5 py-3.5 text-slate-500 font-600">{a.file}</td>
+                      <td className="px-5 py-3.5 text-slate-600">{a.doctor_name || a.doctor || 'Unassigned'}</td>
+                      <td className="px-5 py-3.5">
+                        <div className="flex flex-col gap-1.5 items-start">
+                          <select
+                            value={pendingStatuses[a.id] !== undefined ? pendingStatuses[a.id] : (a.status || 'T')}
+                            onChange={e => handlePendingStatusChange(a.id, e.target.value)}
+                            className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-700 bg-white text-slate-700 cursor-pointer focus:outline-none focus:border-amber-400"
+                          >
+                            <option value="T">⏳ Waiting</option>
+                            <option value="I">🩺 Attending</option>
+                            <option value="A">✅ Attended</option>
+                            <option value="C">❌ Cancelled</option>
+                            <option value="N">🚫 No Show</option>
+                          </select>
+                          {pendingStatuses[a.id] !== undefined && pendingStatuses[a.id] !== a.status && (
+                            <button
+                              onClick={() => handleConfirmSaveStatus(a.id)}
+                              disabled={updatingApptId === a.id}
+                              className="w-full py-1 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-700 text-xs shadow-xs transition-all flex items-center justify-center gap-1 cursor-pointer"
+                            >
+                              {updatingApptId === a.id ? "Saving…" : "Save Status"}
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <div className="flex flex-col gap-1.5">
+                          <button
+                            onClick={() => handleSelectPatientForAction({ id: a.patient_id, name: a.patient_name, internal_file: a.file }, "vitals")}
+                            className="w-full px-3 py-1.5 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 text-xs font-700 transition-colors cursor-pointer text-center"
+                          >
+                            🩺 Capture Vitals
+                          </button>
+                          <button
+                            onClick={() => setSlideOverPatient({ id: a.patient_id, name: a.patient_name, internal_file: a.file })}
+                            className="w-full px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-700 transition-colors cursor-pointer text-center"
+                          >
+                            Medical Summary
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={6} className="px-5 py-6 text-center text-slate-400 font-500">
+                      No patients currently waiting in OPD queue
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </TableSection>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <TableSection title="🩺 Currently Attending Patients" count={attendingList.length}>
+              <table className="w-full text-left text-sm border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-100 text-slate-400 text-xs uppercase font-700 bg-slate-50/50">
+                    <th className="px-5 py-3">Token</th>
+                    <th className="px-5 py-3">Patient</th>
+                    <th className="px-5 py-3">File No.</th>
+                    <th className="px-5 py-3">Doctor</th>
+                    <th className="px-5 py-3">Status</th>
+                    <th className="px-5 py-3">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-600">
+                  {attendingList.length > 0 ? (
+                    attendingList.map(a => (
+                      <tr key={a.id} className="hover:bg-slate-50/60 transition-colors">
+                        <td className="px-5 py-3.5 text-teal-700 font-800">{a.token || `Token ${a.token_number}`}</td>
+                        <td className="px-5 py-3.5 text-slate-800 font-700">{a.patient_name}</td>
+                        <td className="px-5 py-3.5 text-slate-500 font-600">{a.file}</td>
+                        <td className="px-5 py-3.5 text-slate-600">{a.doctor_name || a.doctor || 'Unassigned'}</td>
+                        <td className="px-5 py-3.5">
+                          <div className="flex flex-col gap-1.5 items-start">
+                            <select
+                              value={pendingStatuses[a.id] !== undefined ? pendingStatuses[a.id] : (a.status || 'I')}
+                              onChange={e => handlePendingStatusChange(a.id, e.target.value)}
+                              className="w-full px-2 py-1.5 rounded-lg border border-slate-200 text-xs font-700 bg-white text-slate-700 cursor-pointer focus:outline-none focus:border-teal-400"
+                            >
+                              <option value="T">⏳ Waiting</option>
+                              <option value="I">🩺 Attending</option>
+                              <option value="A">✅ Attended</option>
+                              <option value="C">❌ Cancelled</option>
+                              <option value="N">🚫 No Show</option>
+                            </select>
+                            {pendingStatuses[a.id] !== undefined && pendingStatuses[a.id] !== a.status && (
+                              <button
+                                onClick={() => handleConfirmSaveStatus(a.id)}
+                                disabled={updatingApptId === a.id}
+                                className="w-full py-1 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-700 text-xs shadow-xs transition-all flex items-center justify-center gap-1 cursor-pointer"
+                              >
+                                {updatingApptId === a.id ? "Saving…" : "Save Status"}
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <div className="flex flex-col gap-1.5">
+                            <button
+                              onClick={() => handleSelectPatientForAction({ id: a.patient_id, name: a.patient_name, internal_file: a.file }, "vitals")}
+                              className="w-full px-2.5 py-1.5 rounded-lg bg-teal-50 text-teal-700 hover:bg-teal-100 text-xs font-700 transition-colors cursor-pointer text-center"
+                            >
+                              🩺 Capture Vitals
+                            </button>
+                            <button
+                              onClick={() => setSlideOverPatient({ id: a.patient_id, name: a.patient_name, internal_file: a.file })}
+                              className="w-full px-2.5 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-700 transition-colors cursor-pointer text-center"
+                            >
+                              Medical Summary
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={6} className="px-5 py-6 text-center text-slate-400 font-500">
+                        No patients currently attending
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </TableSection>
+
+            <TableSection title="✅ Attended Today" count={attendedList.length}>
+              <table className="w-full text-left text-sm border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-100 text-slate-400 text-xs uppercase font-700 bg-slate-50/50">
+                    <th className="px-5 py-3">Token</th>
+                    <th className="px-5 py-3">Patient</th>
+                    <th className="px-5 py-3">File No.</th>
+                    <th className="px-5 py-3">Doctor</th>
+                    <th className="px-5 py-3">Status</th>
+                    <th className="px-5 py-3">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-600">
+                  {attendedList.length > 0 ? (
+                    attendedList.map(a => (
+                      <tr key={a.id} className="hover:bg-slate-50/60 transition-colors">
+                        <td className="px-5 py-3.5 text-emerald-700 font-800">{a.token || `Token ${a.token_number}`}</td>
+                        <td className="px-5 py-3.5 text-slate-800 font-700">{a.patient_name}</td>
+                        <td className="px-5 py-3.5 text-slate-500 font-600">{a.file}</td>
+                        <td className="px-5 py-3.5 text-slate-600">{a.doctor_name || a.doctor || 'Unassigned'}</td>
+                        <td className="px-5 py-3.5">
+                          <div className="flex flex-col gap-1.5 items-start">
+                            <select
+                              value={pendingStatuses[a.id] !== undefined ? pendingStatuses[a.id] : (a.status || 'A')}
+                              onChange={e => handlePendingStatusChange(a.id, e.target.value)}
+                              className="w-full px-2 py-1.5 rounded-lg border border-slate-200 text-xs font-700 bg-white text-slate-700 cursor-pointer focus:outline-none focus:border-emerald-400"
+                            >
+                              <option value="T">⏳ Waiting</option>
+                              <option value="I">🩺 Attending</option>
+                              <option value="A">✅ Attended</option>
+                              <option value="C">❌ Cancelled</option>
+                              <option value="N">🚫 No Show</option>
+                            </select>
+                            {pendingStatuses[a.id] !== undefined && pendingStatuses[a.id] !== a.status && (
+                              <button
+                                onClick={() => handleConfirmSaveStatus(a.id)}
+                                disabled={updatingApptId === a.id}
+                                className="w-full py-1 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-700 text-xs shadow-xs transition-all flex items-center justify-center gap-1 cursor-pointer"
+                              >
+                                {updatingApptId === a.id ? "Saving…" : "Save Status"}
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <button
+                            onClick={() => setSlideOverPatient({ id: a.patient_id, name: a.patient_name, internal_file: a.file })}
+                            className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 text-xs font-700 transition-colors cursor-pointer"
+                          >
+                            👁️ Summary
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={6} className="px-5 py-6 text-center text-slate-400 font-500">
+                        No attended patients yet today
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </TableSection>
           </div>
         </div>
 
-        {/* ── STATS TILES ── */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <StatTile label="Waiting Queue" value={counts.waiting} icon={<ClockIcon />} bg="bg-slate-100" text="text-slate-700" />
-          <StatTile label="Attending Now" value={counts.attending} icon={<StethoscopeIcon />} bg="bg-amber-50" text="text-amber-700" />
-          <StatTile label="Attended Today" value={counts.attended} icon={<CheckCircleIcon />} bg="bg-emerald-50" text="text-emerald-700" />
-          <StatTile label="Total Today" value={counts.total_today} icon={<CalendarIcon />} bg="bg-sky-50" text="text-sky-700" />
-        </div>
-
-        {/* ── ATTENDING & ATTENDED TABLES (SIDE BY SIDE) ── */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <TableSection title="🩺 Attending Patients" count={attendingList.length}>
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50/70 border-b border-slate-100 text-xs font-800 text-slate-400 uppercase tracking-wider">
-                  <th className="px-4 py-3">Token</th>
-                  <th className="px-4 py-3">Patient Name</th>
-                  <th className="px-4 py-3">Internal File</th>
-                  <th className="px-4 py-3">Doctor</th>
-                  <th className="px-4 py-3">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-sm font-600 text-slate-700">
-                {attendingList.length > 0 ? (
-                  attendingList.map(row => (
-                    <tr key={row.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="px-4 py-3.5 whitespace-nowrap font-800 text-amber-600">{row.token}</td>
-                      <td className="px-4 py-3.5 whitespace-nowrap font-700 text-slate-900">{row.patient_name || row.name}</td>
-                      <td className="px-4 py-3.5 whitespace-nowrap text-slate-500">{row.file}</td>
-                      <td className="px-4 py-3.5 whitespace-nowrap">{row.doctor}</td>
-                      <td className="px-4 py-3.5 whitespace-nowrap">
-                        <button
-                          onClick={() => setSlideOver({
-                            name: row.patient_name || row.name,
-                            file: row.file,
-                            ext: "-",
-                            bloodGroup: "-",
-                            allergies: "None recorded",
-                            familyHistory: "None on record",
-                            comorbidities: [],
-                            vitals: [],
-                          })}
-                          className="px-3 py-1.5 rounded-lg bg-teal-50 text-teal-700 font-700 text-xs hover:bg-teal-100 transition-colors"
-                        >
-                          View Summary
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-6 text-center text-slate-400 font-600 text-xs">
-                      No attending patients in queue.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </TableSection>
-
-          <TableSection title="✅ Attended Patients" count={attendedList.length}>
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-slate-50/70 border-b border-slate-100 text-xs font-800 text-slate-400 uppercase tracking-wider">
-                  <th className="px-4 py-3">Token</th>
-                  <th className="px-4 py-3">Patient Name</th>
-                  <th className="px-4 py-3">Internal File</th>
-                  <th className="px-4 py-3">Doctor</th>
-                  <th className="px-4 py-3">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-sm font-600 text-slate-700">
-                {attendedList.length > 0 ? (
-                  attendedList.map(row => (
-                    <tr key={row.id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="px-4 py-3.5 whitespace-nowrap font-800 text-emerald-600">{row.token}</td>
-                      <td className="px-4 py-3.5 whitespace-nowrap font-700 text-slate-900">{row.patient_name || row.name}</td>
-                      <td className="px-4 py-3.5 whitespace-nowrap text-slate-500">{row.file}</td>
-                      <td className="px-4 py-3.5 whitespace-nowrap">{row.doctor}</td>
-                      <td className="px-4 py-3.5 whitespace-nowrap">
-                        <button
-                          onClick={() => setSlideOver({
-                            name: row.patient_name || row.name,
-                            file: row.file,
-                            ext: "-",
-                            bloodGroup: "-",
-                            allergies: "None recorded",
-                            familyHistory: "None on record",
-                            comorbidities: [],
-                            vitals: [],
-                          })}
-                          className="px-3 py-1.5 rounded-lg bg-slate-100 text-slate-700 font-700 text-xs hover:bg-slate-200 transition-colors"
-                        >
-                          View Summary
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-6 text-center text-slate-400 font-600 text-xs">
-                      No attended patients recorded today.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </TableSection>
-        </div>
-
-        {/* ── COMPOUNDER ACTIONS TAB PANELS ── */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between flex-wrap gap-3 bg-gradient-to-r from-teal-50 to-sky-50">
-            <h2 className="font-800 text-slate-800 text-lg">⚡ Compounder Quick Actions</h2>
+        {/* ── QUICK ACTIONS PANEL ── */}
+        <div id="quick-actions-panel" className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+            <h2 className="font-800 text-slate-800 text-base">⚡ Quick Actions &amp; Patient Records</h2>
             <div className="flex gap-2 flex-wrap">
               {[
                 { id: "register" as CompounderTab, label: "👤 Register Patient" },
@@ -261,10 +529,10 @@ export function CompounderDeskPage({
           </div>
 
           <div className="p-6">
-            {activeTab === "register" && <RegisterPatientForm />}
-            {activeTab === "appointment" && <CreateAppointmentForm />}
-            {activeTab === "vitals" && <VitalsMiniForm />}
-            {activeTab === "medical" && <MedicalHistoryForm />}
+            {activeTab === "register" && <RegisterPatientForm onPatientRegistered={() => loadDashboard()} />}
+            {activeTab === "appointment" && <CreateAppointmentForm selectedPatient={selectedPatient} onAppointmentCreated={() => loadDashboard()} />}
+            {activeTab === "vitals" && <VitalsMiniForm selectedPatient={selectedPatient} />}
+            {activeTab === "medical" && <MedicalHistoryForm selectedPatient={selectedPatient} />}
           </div>
         </div>
 

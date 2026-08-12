@@ -13,7 +13,7 @@ import {
   PERSONAL_HISTORY_ITEMS,
 } from "../data/rheumatDiagnosisData"
 import { RheumatDiagnosisFormState } from "../types/rheumatDiagnosis"
-import { fetchRumatDiagnosis, saveRumatDiagnosis } from "../services/api"
+import { fetchDoctorDashboard, fetchRumatDiagnosis, saveRumatDiagnosis } from "../services/api"
 
 const CLEAN_INITIAL_STATE: RheumatDiagnosisFormState = {
   msm: {
@@ -48,7 +48,7 @@ const CLEAN_INITIAL_STATE: RheumatDiagnosisFormState = {
   pastHistory: {},
   obstetricHistory: { active: false, description: "" },
   personalHistory: {},
-  spineExam: { active: false, restrictedMovement: false, description: "" },
+  spineExam: { restrictedMovement: false, description: "" },
   summaryNote: "",
   diseaseName: "Rheumatoid Arthritis",
   diseaseState: "Active",
@@ -60,16 +60,31 @@ export function RheumatDiagnosisPage({ onBackToDashboard }: { onBackToDashboard:
   const [openAccordion, setOpenAccordion] = useState<number | null>(0)
   const [isGenerating, setIsGenerating] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState(false)
+  const [activePatient, setActivePatient] = useState<any | null>(null)
+  const [activeApptId, setActiveApptId] = useState<string | number>("")
 
-  // Fetch backend data on mount
+  // Auto-fetch active patient from doctor queue on mount
   useEffect(() => {
-    fetchRumatDiagnosis(1)
+    fetchDoctorDashboard()
       .then(res => {
         if (res.ok) {
-          if (res.disease_name) setForm(p => ({ ...p, diseaseName: res.disease_name }))
-          if (res.disease_state) setForm(p => ({ ...p, diseaseState: res.disease_state }))
-          if (res.checklist_data && res.checklist_data.description_t) {
-            setForm(p => ({ ...p, summaryNote: res.checklist_data.description_t }))
+          const queue = [...(res.attending || []), ...(res.waiting || []), ...(res.attended || [])]
+          if (queue.length > 0) {
+            const first = queue[0]
+            setActivePatient(first)
+            setActiveApptId(first.id)
+
+            fetchRumatDiagnosis(first.id)
+              .then(diagRes => {
+                if (diagRes.ok) {
+                  if (diagRes.disease_name) setForm(p => ({ ...p, diseaseName: diagRes.disease_name }))
+                  if (diagRes.disease_state) setForm(p => ({ ...p, diseaseState: diagRes.disease_state }))
+                  if (diagRes.checklist_data && diagRes.checklist_data.description_t) {
+                    setForm(p => ({ ...p, summaryNote: diagRes.checklist_data.description_t }))
+                  }
+                }
+              })
+              .catch(() => {})
           }
         }
       })
@@ -88,7 +103,6 @@ export function RheumatDiagnosisPage({ onBackToDashboard }: { onBackToDashboard:
   const phCount = Object.values(form.pastHistory).filter(Boolean).length
   const perhCount = Object.values(form.personalHistory).filter(Boolean).length
 
-  // Simulated AI Summary Note Streaming Generation
   const handleGenerateAI = () => {
     setIsGenerating(true)
     setForm(prev => ({ ...prev, summaryNote: "" }))
@@ -101,11 +115,11 @@ export function RheumatDiagnosisPage({ onBackToDashboard }: { onBackToDashboard:
 
     const activeDerm = Object.keys(form.dermatological)
       .filter(k => form.dermatological[k])
-      .map(k => DERMATOLOGICAL_ITEMS.find(d => d.id === k)?.label)
+      .map(k => DERMATOLOGICAL_ITEMS.find(j => j.id === k)?.label)
       .filter(Boolean)
       .join(", ")
 
-    const generatedText = `PATIENT CLINICAL SUMMARY NOTE:
+    const generatedText = `CLINICAL ASSESSMENT SUMMARY:
 Patient presents with active Musculoskeletal Manifestations.
 Symmetric joint involvement noted in: ${activeJoints || "Hands and Wrists"}.
 Pattern: Additive.
@@ -126,6 +140,7 @@ Assessment indicates ${form.diseaseName} (${form.diseaseState}).`
   }
 
   const handleSave = () => {
+    if (!activeApptId) return
     const payload = {
       description_t: form.summaryNote,
       disease_name: form.diseaseName,
@@ -134,7 +149,7 @@ Assessment indicates ${form.diseaseName} (${form.diseaseState}).`
       symmetricity: form.msm.symmetricity,
     }
 
-    saveRumatDiagnosis(1, payload).catch(() => {})
+    saveRumatDiagnosis(activeApptId, payload).catch(() => {})
 
     setSaveSuccess(true)
     setTimeout(() => {
@@ -160,9 +175,11 @@ Assessment indicates ${form.diseaseName} (${form.diseaseState}).`
                 12 Categories Checklist
               </span>
             </div>
-            <p className="text-slate-500 font-500 text-sm mt-1">
-              Document patient manifestations and generate AI clinical notes instantly.
-            </p>
+            {activePatient && (
+              <p className="text-teal-700 font-700 text-sm mt-1">
+                🎯 Patient: <strong>{activePatient.patient_name}</strong> (File: {activePatient.file})
+              </p>
+            )}
           </div>
 
           <button
@@ -180,156 +197,57 @@ Assessment indicates ${form.diseaseName} (${form.diseaseState}).`
           </div>
         )}
 
-        {/* 12 Accordion Categories */}
+        {/* Accordions Checklist */}
         <div className="space-y-3">
+          {/* 1. MSM */}
+          <CategoryAccordion title="Musculoskeletal Manifestations (MSM)" icon="🦴" isOpen={openAccordion === 0} onToggle={() => toggleAccordion(0)} activeCount={msmCount}>
+            <div className="space-y-4">
+              <div className="flex items-center gap-4 flex-wrap">
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-700 text-slate-800">
+                  <input
+                    type="checkbox"
+                    checked={form.msm.activeMSM}
+                    onChange={e => setForm(p => ({ ...p, msm: { ...p.msm, activeMSM: e.target.checked } }))}
+                    className="w-4 h-4 rounded text-teal-600"
+                  />
+                  Active MSM Symptoms
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-700 text-slate-800">
+                  <input
+                    type="checkbox"
+                    checked={form.msm.symmetricity}
+                    onChange={e => setForm(p => ({ ...p, msm: { ...p.msm, symmetricity: e.target.checked } }))}
+                    className="w-4 h-4 rounded text-teal-600"
+                  />
+                  Symmetricity
+                </label>
+              </div>
 
-          {/* 1. Musculoskeletal Manifestations */}
-          <CategoryAccordion
-            title="Musculoskeletal Manifestations"
-            icon="🦴"
-            isOpen={openAccordion === 0}
-            onToggle={() => toggleAccordion(0)}
-            activeCount={msmCount}
-          >
-            {/* Duration inputs */}
-            <div className="grid grid-cols-3 gap-3 border-b border-slate-100 pb-4">
               <div>
-                <Label>Duration Years</Label>
-                <Input
-                  type="number"
-                  noMic
-                  value={form.msm.years}
-                  onChange={e => setForm(p => ({ ...p, msm: { ...p.msm, years: e.target.value } }))}
-                />
-              </div>
-              <div>
-                <Label>Duration Months</Label>
-                <Input
-                  type="number"
-                  noMic
-                  value={form.msm.months}
-                  onChange={e => setForm(p => ({ ...p, msm: { ...p.msm, months: e.target.value } }))}
-                />
-              </div>
-              <div>
-                <Label>Duration Days</Label>
-                <Input
-                  type="number"
-                  noMic
-                  value={form.msm.days}
-                  onChange={e => setForm(p => ({ ...p, msm: { ...p.msm, days: e.target.value } }))}
-                />
-              </div>
-            </div>
-
-            {/* Main checkboxes */}
-            <div className="flex gap-6">
-              <label className="flex items-center gap-2 cursor-pointer text-sm font-700 text-slate-800">
-                <input
-                  type="checkbox"
-                  checked={form.msm.activeMSM}
-                  onChange={e => setForm(p => ({ ...p, msm: { ...p.msm, activeMSM: e.target.checked } }))}
-                  className="w-4 h-4 rounded text-teal-600 focus:ring-teal-400"
-                />
-                Active Musculoskeletal Manifestation
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer text-sm font-700 text-slate-800">
-                <input
-                  type="checkbox"
-                  checked={form.msm.symmetricity}
-                  onChange={e => setForm(p => ({ ...p, msm: { ...p.msm, symmetricity: e.target.checked } }))}
-                  className="w-4 h-4 rounded text-teal-600 focus:ring-teal-400"
-                />
-                Symmetric Involvement
-              </label>
-            </div>
-
-            {/* Joint Involvement Grid */}
-            <div>
-              <h4 className="font-800 text-slate-500 text-xs uppercase tracking-wide mb-2">Joint Involvement (JI)</h4>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {JOINTS_LIST.map(j => (
-                  <label key={j.id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 cursor-pointer text-xs font-600 text-slate-700">
-                    <input
-                      type="checkbox"
-                      checked={!!form.msm.jointInvolvement[j.id]}
-                      onChange={e => setForm(p => ({
-                        ...p,
-                        msm: {
-                          ...p.msm,
-                          jointInvolvement: { ...p.msm.jointInvolvement, [j.id]: e.target.checked },
-                        },
-                      }))}
-                      className="w-4 h-4 rounded text-teal-600"
-                    />
-                    <span>{j.label}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Limitation of Movement Grid */}
-            <div>
-              <h4 className="font-800 text-slate-500 text-xs uppercase tracking-wide mb-2">Limitation of Movement (LOM)</h4>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {JOINTS_LIST.map(j => (
-                  <label key={`lom_${j.id}`} className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 cursor-pointer text-xs font-600 text-slate-700">
-                    <input
-                      type="checkbox"
-                      checked={!!form.msm.limitationMovement[j.id]}
-                      onChange={e => setForm(p => ({
-                        ...p,
-                        msm: {
-                          ...p.msm,
-                          limitationMovement: { ...p.msm.limitationMovement, [j.id]: e.target.checked },
-                        },
-                      }))}
-                      className="w-4 h-4 rounded text-teal-600"
-                    />
-                    <span>{j.label} LOM</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Pattern */}
-            <div>
-              <h4 className="font-800 text-slate-500 text-xs uppercase tracking-wide mb-2">Pattern</h4>
-              <div className="flex gap-6">
-                {[
-                  { id: "patternAdditive", label: "Additive Pattern" },
-                  { id: "patternRelapsing", label: "Relapsing" },
-                  { id: "patternEpisodic", label: "Episodic" },
-                ].map(p => (
-                  <label key={p.id} className="flex items-center gap-2 cursor-pointer text-xs font-700 text-slate-700">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(form.msm[p.id as keyof typeof form.msm])}
-                      onChange={e => setForm(prev => ({
-                        ...prev,
-                        msm: { ...prev.msm, [p.id]: e.target.checked },
-                      }))}
-                      className="w-4 h-4 rounded text-teal-600"
-                    />
-                    <span>{p.label}</span>
-                  </label>
-                ))}
+                <Label>Joint Involvement:</Label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-1">
+                  {JOINTS_LIST.map(j => (
+                    <label key={j.id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 cursor-pointer text-xs font-600 text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={!!form.msm.jointInvolvement[j.id]}
+                        onChange={e => setForm(p => ({
+                          ...p,
+                          msm: { ...p.msm, jointInvolvement: { ...p.msm.jointInvolvement, [j.id]: e.target.checked } }
+                        }))}
+                        className="w-4 h-4 rounded text-teal-600"
+                      />
+                      <span>{j.label}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
             </div>
           </CategoryAccordion>
 
-          {/* 2. Back Ache */}
-          <CategoryAccordion title="Back Ache" icon="🧍" isOpen={openAccordion === 1} onToggle={() => toggleAccordion(1)}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <label className="flex items-center gap-2 cursor-pointer text-xs font-700 text-slate-800">
-                <input
-                  type="checkbox"
-                  checked={form.backAche.activeBA}
-                  onChange={e => setForm(p => ({ ...p, backAche: { ...p.backAche, activeBA: e.target.checked } }))}
-                  className="w-4 h-4 rounded text-teal-600"
-                />
-                Back Ache
-              </label>
+          {/* 2. Inflammatory Backache */}
+          <CategoryAccordion title="Inflammatory Backache (IBA)" icon="🩸" isOpen={openAccordion === 1} onToggle={() => toggleAccordion(1)}>
+            <div className="space-y-3">
               <label className="flex items-center gap-2 cursor-pointer text-xs font-700 text-slate-800">
                 <input
                   type="checkbox"
@@ -337,33 +255,22 @@ Assessment indicates ${form.diseaseName} (${form.diseaseState}).`
                   onChange={e => setForm(p => ({ ...p, backAche: { ...p.backAche, earlyMorningStiffness: e.target.checked } }))}
                   className="w-4 h-4 rounded text-teal-600"
                 />
-                Early Morning Stiffness
+                Early Morning Stiffness &gt; 30 mins
               </label>
             </div>
           </CategoryAccordion>
 
-          {/* 3. Weakness */}
-          <CategoryAccordion title="Weakness" icon="⚡" isOpen={openAccordion === 2} onToggle={() => toggleAccordion(2)}>
-            <div className="space-y-3">
-              <label className="flex items-center gap-2 cursor-pointer text-xs font-700 text-slate-800">
-                <input
-                  type="checkbox"
-                  checked={form.weakness.active}
-                  onChange={e => setForm(p => ({ ...p, weakness: { ...p.weakness, active: e.target.checked } }))}
-                  className="w-4 h-4 rounded text-teal-600"
-                />
-                Weakness Condition
-              </label>
-              <Input
-                placeholder="Description of muscle or grip weakness…"
-                value={form.weakness.description}
-                onChange={e => setForm(p => ({ ...p, weakness: { ...p.weakness, description: e.target.value } }))}
-              />
-            </div>
+          {/* 3. Muscle Weakness */}
+          <CategoryAccordion title="Muscle Weakness" icon="💪" isOpen={openAccordion === 2} onToggle={() => toggleAccordion(2)}>
+            <Textarea
+              placeholder="Describe proximal or distal muscle weakness details…"
+              value={form.weakness.description}
+              onChange={e => setForm(p => ({ ...p, weakness: { ...p.weakness, description: e.target.value } }))}
+            />
           </CategoryAccordion>
 
           {/* 4. Dermatological */}
-          <CategoryAccordion title="Dermatological" icon="🧴" isOpen={openAccordion === 3} onToggle={() => toggleAccordion(3)} activeCount={derCount}>
+          <CategoryAccordion title="Dermatological Manifestations" icon="🖐️" isOpen={openAccordion === 3} onToggle={() => toggleAccordion(3)} activeCount={derCount}>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {DERMATOLOGICAL_ITEMS.map(item => (
                 <label key={item.id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 cursor-pointer text-xs font-600 text-slate-700">
@@ -383,7 +290,7 @@ Assessment indicates ${form.diseaseName} (${form.diseaseState}).`
           </CategoryAccordion>
 
           {/* 5. Ophthalmological */}
-          <CategoryAccordion title="Ophthalmological" icon="👁️" isOpen={openAccordion === 4} onToggle={() => toggleAccordion(4)} activeCount={opthCount}>
+          <CategoryAccordion title="Ophthalmological Manifestations" icon="👁️" isOpen={openAccordion === 4} onToggle={() => toggleAccordion(4)} activeCount={opthCount}>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {OPHTHALMOLOGICAL_ITEMS.map(item => (
                 <label key={item.id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-50 cursor-pointer text-xs font-600 text-slate-700">
@@ -403,84 +310,51 @@ Assessment indicates ${form.diseaseName} (${form.diseaseState}).`
           </CategoryAccordion>
 
           {/* 6. Constitutional */}
-          <CategoryAccordion title="Constitutional" icon="🌡️" isOpen={openAccordion === 5} onToggle={() => toggleAccordion(5)} activeCount={consCount}>
-            <div className="flex gap-6">
+          <CategoryAccordion title="Constitutional Symptoms" icon="🌡️" isOpen={openAccordion === 5} onToggle={() => toggleAccordion(5)} activeCount={consCount}>
+            <div className="flex gap-4 flex-wrap">
               {[
+                { id: "fever", label: "Fever" },
                 { id: "weightLoss", label: "Weight Loss" },
                 { id: "weightGain", label: "Weight Gain" },
-                { id: "fever", label: "Fever" },
               ].map(item => (
-                <label key={item.id} className="flex items-center gap-2 cursor-pointer text-xs font-700 text-slate-700">
+                <label key={item.id} className="flex items-center gap-2 cursor-pointer text-xs font-700 text-slate-800">
                   <input
                     type="checkbox"
-                    checked={Boolean(form.constitutional[item.id as keyof typeof form.constitutional])}
+                    checked={!!(form.constitutional as any)[item.id]}
                     onChange={e => setForm(p => ({
                       ...p,
                       constitutional: { ...p.constitutional, [item.id]: e.target.checked },
                     }))}
                     className="w-4 h-4 rounded text-teal-600"
                   />
-                  <span>{item.label}</span>
+                  {item.label}
                 </label>
               ))}
             </div>
           </CategoryAccordion>
 
-          {/* 7. Allergy */}
-          <CategoryAccordion title="Allergy" icon="⚠️" isOpen={openAccordion === 6} onToggle={() => toggleAccordion(6)}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <Label>Drugs Allergy Description</Label>
-                <Textarea
-                  rows={2}
-                  value={form.allergy.drugsDescription}
-                  onChange={e => setForm(p => ({ ...p, allergy: { ...p.allergy, drugsDescription: e.target.value } }))}
-                  placeholder="e.g. Penicillin, NSAIDs"
-                />
-              </div>
-              <div>
-                <Label>Other Allergy Description</Label>
-                <Textarea
-                  rows={2}
-                  value={form.allergy.otherDescription}
-                  onChange={e => setForm(p => ({ ...p, allergy: { ...p.allergy, otherDescription: e.target.value } }))}
-                  placeholder="e.g. Dust, Pollen, Certain Foods"
-                />
-              </div>
-            </div>
+          {/* 7. Drug / Food Allergies */}
+          <CategoryAccordion title="Drug &amp; Food Allergies" icon="💊" isOpen={openAccordion === 6} onToggle={() => toggleAccordion(6)}>
+            <Input
+              placeholder="List drug allergies or severe reactions…"
+              value={form.allergy.drugsDescription}
+              onChange={e => setForm(p => ({ ...p, allergy: { ...p.allergy, drugsDescription: e.target.value } }))}
+            />
           </CategoryAccordion>
 
-          {/* 8. Systems */}
-          <CategoryAccordion title="Systems Manifestations" icon="🫀" isOpen={openAccordion === 7} onToggle={() => toggleAccordion(7)}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <Label>Cardiorespiratory Description</Label>
-                <Input
-                  value={form.systems.cardiorespiratory}
-                  onChange={e => setForm(p => ({ ...p, systems: { ...p.systems, cardiorespiratory: e.target.value } }))}
-                />
-              </div>
-              <div>
-                <Label>Gastrointestinal Description</Label>
-                <Input
-                  value={form.systems.gastrointestinal}
-                  onChange={e => setForm(p => ({ ...p, systems: { ...p.systems, gastrointestinal: e.target.value } }))}
-                />
-              </div>
-              <div>
-                <Label>CNS Description</Label>
-                <Input
-                  value={form.systems.cns}
-                  onChange={e => setForm(p => ({ ...p, systems: { ...p.systems, cns: e.target.value } }))}
-                />
-              </div>
-              <div>
-                <Label>Respiratory (RS) Description</Label>
-                <Input
-                  value={form.systems.respiratory}
-                  onChange={e => setForm(p => ({ ...p, systems: { ...p.systems, respiratory: e.target.value } }))}
-                />
-              </div>
+          {/* 8. Systemic Involvement */}
+          <CategoryAccordion title="Systemic Involvement (RS, CVS, GIS, CNS)" icon="🫀" isOpen={openAccordion === 7} onToggle={() => toggleAccordion(7)}>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Input
+                placeholder="Cardiorespiratory findings…"
+                value={form.systems.cardiorespiratory}
+                onChange={e => setForm(p => ({ ...p, systems: { ...p.systems, cardiorespiratory: e.target.value } }))}
+              />
+              <Input
+                placeholder="Gastrointestinal findings…"
+                value={form.systems.gastrointestinal}
+                onChange={e => setForm(p => ({ ...p, systems: { ...p.systems, gastrointestinal: e.target.value } }))}
+              />
             </div>
           </CategoryAccordion>
 
@@ -505,9 +379,8 @@ Assessment indicates ${form.diseaseName} (${form.diseaseState}).`
           </CategoryAccordion>
 
           {/* 10. Obstetric History */}
-          <CategoryAccordion title="Obstetric History" icon="👶" isOpen={openAccordion === 9} onToggle={() => toggleAccordion(9)}>
-            <Textarea
-              rows={2}
+          <CategoryAccordion title="Obstetric History" icon="🤰" isOpen={openAccordion === 9} onToggle={() => toggleAccordion(9)}>
+            <Input
               value={form.obstetricHistory.description}
               onChange={e => setForm(p => ({ ...p, obstetricHistory: { ...p.obstetricHistory, description: e.target.value } }))}
               placeholder="Pregnancy history, miscarriages, live births…"
