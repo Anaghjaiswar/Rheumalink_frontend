@@ -5,7 +5,7 @@ import { Textarea } from "../ui/Textarea"
 import { Select } from "../ui/Select"
 import { PrimaryBtn, OutlineBtn } from "../ui/Buttons"
 import { Card } from "../ui/Card"
-import { fetchDoctorDashboard, saveDiagnosis } from "../../services/api"
+import { fetchDoctorDashboard, saveDiagnosis, calculateDAS28Score, fetchDiagnosisStatus } from "../../services/api"
 
 export function DiagnosisBookForm({
   onOpenJointChart,
@@ -20,6 +20,9 @@ export function DiagnosisBookForm({
   const [stage, setStage] = useState("")
   const [versionNote, setVersionNote] = useState("")
   const [das28, setDas28] = useState<string | null>(null)
+  const [das28Data, setDas28Data] = useState<any | null>(null)
+  const [isCalculatingDas28, setIsCalculatingDas28] = useState(false)
+  const [diagnosisStatus, setDiagnosisStatus] = useState<{ joint_chart?: boolean; rumat_diagnosis?: boolean } | null>(null)
   
   const [loading, setLoading] = useState(false)
   const [savedMsg, setSavedMsg] = useState("")
@@ -31,10 +34,47 @@ export function DiagnosisBookForm({
         if (res.ok) {
           const list = [...(res.attending || []), ...(res.attended || []), ...(res.waiting || [])]
           setAppointments(list)
+          if (list.length > 0 && !selectedApptId) {
+            setSelectedApptId(String(list[0].id))
+          }
         }
       })
       .catch(() => {})
   }, [])
+
+  useEffect(() => {
+    if (selectedApptId) {
+      fetchDiagnosisStatus(selectedApptId)
+        .then(res => {
+          if (res) setDiagnosisStatus(res)
+        })
+        .catch(() => {})
+    }
+  }, [selectedApptId])
+
+  const handleCalculateDAS28 = async () => {
+    if (!selectedApptId) {
+      setErrorMsg("Please select an appointment first.")
+      return
+    }
+
+    setIsCalculatingDas28(true)
+    setErrorMsg("")
+
+    try {
+      const res = await calculateDAS28Score(selectedApptId)
+      setIsCalculatingDas28(false)
+      if (res.ok && res.das28_score !== undefined) {
+        setDas28(String(res.das28_score))
+        setDas28Data(res)
+      } else {
+        setErrorMsg(res.error || "Unable to calculate DAS28. Ensure joint chart and vitals (ESR/CRP) are recorded.")
+      }
+    } catch (err: any) {
+      setIsCalculatingDas28(false)
+      setErrorMsg(err.message || "Error calculating DAS28 score.")
+    }
+  }
 
   const handleSave = async () => {
     if (!selectedApptId) {
@@ -89,7 +129,7 @@ export function DiagnosisBookForm({
             {appointments.length > 0 ? (
               appointments.map(a => (
                 <option key={a.id} value={a.id}>
-                  {a.patient_name} — {a.token} ({a.status})
+                  {a.patient_name} — {a.token || `Token ${a.token_number}`} ({a.status || a.status_code})
                 </option>
               ))
             ) : (
@@ -117,7 +157,9 @@ export function DiagnosisBookForm({
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
               <p className="font-800 text-slate-800 text-base">📖 Rheumatoid Symptoms Checklist &amp; AI Notes</p>
-              <span className="px-2.5 py-1 rounded-full bg-teal-100 text-teal-800 text-xs font-700 border border-teal-200">12 Categories</span>
+              <span className={`px-2.5 py-1 rounded-full text-xs font-700 border ${diagnosisStatus?.rumat_diagnosis ? "bg-emerald-100 text-emerald-800 border-emerald-300" : "bg-teal-100 text-teal-800 border-teal-200"}`}>
+                {diagnosisStatus?.rumat_diagnosis ? "✅ Filled for Appt" : "12 Categories"}
+              </span>
             </div>
             <p className="text-slate-600 text-sm font-500">Fill detailed 12-category symptoms checklist and generate professional clinical summary notes using AI.</p>
           </div>
@@ -131,7 +173,9 @@ export function DiagnosisBookForm({
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
               <p className="font-800 text-slate-800">🦴 Joint Chart Entry (44 Joints)</p>
-              <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-700 border border-emerald-200">✅ Active Homunculus</span>
+              <span className={`px-2.5 py-1 rounded-full text-xs font-700 border ${diagnosisStatus?.joint_chart ? "bg-emerald-100 text-emerald-800 border-emerald-300" : "bg-slate-100 text-slate-700 border-slate-200"}`}>
+                {diagnosisStatus?.joint_chart ? "✅ Recorded" : "44 Joints"}
+              </span>
             </div>
             <p className="text-slate-500 text-sm font-600">Joint chart homunculus is managed on a dedicated interactive 725x1100 canvas.</p>
           </div>
@@ -141,20 +185,29 @@ export function DiagnosisBookForm({
         {/* DAS28 */}
         <Card className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex-1">
-            <p className="font-800 text-slate-800 mb-1">📐 Fast DAS28 Score</p>
+            <p className="font-800 text-slate-800 mb-1">📐 Fast DAS28 Score Calculation</p>
             {das28 ? (
               <div className="flex items-center gap-3 mt-2">
                 <span className="text-3xl font-800 text-teal-700">{das28}</span>
                 <span className={`px-3 py-1 rounded-full text-xs font-700 border ${parseFloat(das28) < 2.6 ? "bg-emerald-100 text-emerald-700 border-emerald-200" : parseFloat(das28) < 3.2 ? "bg-yellow-100 text-yellow-700 border-yellow-200" : parseFloat(das28) < 5.1 ? "bg-amber-100 text-amber-700 border-amber-200" : "bg-red-100 text-red-700 border-red-200"}`}>
                   {parseFloat(das28) < 2.6 ? "Remission" : parseFloat(das28) < 3.2 ? "Low Activity" : parseFloat(das28) < 5.1 ? "Moderate Activity" : "High Activity"}
                 </span>
+                {das28Data && (
+                  <span className="text-xs text-slate-500 font-600">
+                    (Tender: {das28Data.tender_count ?? "-"}, Swollen: {das28Data.swollen_count ?? "-"}, ESR: {das28Data.esr ?? "-"})
+                  </span>
+                )}
               </div>
             ) : (
               <p className="text-slate-400 text-sm font-600">Score will appear here after calculation.</p>
             )}
           </div>
-          <PrimaryBtn onClick={() => setDas28("4.2")} className="flex-shrink-0 text-sm py-2.5 px-4">
-            Calculate for Selected Appointment
+          <PrimaryBtn
+            onClick={handleCalculateDAS28}
+            disabled={isCalculatingDas28 || !selectedApptId}
+            className="flex-shrink-0 text-sm py-2.5 px-4"
+          >
+            {isCalculatingDas28 ? "Calculating…" : "Calculate for Selected Appointment"}
           </PrimaryBtn>
         </Card>
       </div>

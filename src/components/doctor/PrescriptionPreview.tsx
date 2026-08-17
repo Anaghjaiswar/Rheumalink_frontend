@@ -1,118 +1,293 @@
-import React from "react"
+import React, { useState, useEffect } from "react"
 import { HeartPulseIcon, CloseIcon } from "../icons"
+import { getPrescriptionPdfUrl, sendPrescriptionWhatsApp } from "../../services/api"
+import { getValidAccessToken } from "../../services/auth"
 
-export function PrescriptionPreview({ onClose }: { onClose: () => void }) {
+export function PrescriptionPreview({
+  prescriptionId,
+  patientName = "Patient",
+  patientFile = "",
+  doctorName = "Doctor",
+  dateStr = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
+  onClose,
+}: {
+  prescriptionId?: number | string
+  patientName?: string
+  patientFile?: string
+  doctorName?: string
+  dateStr?: string
+  onClose: () => void
+}) {
+  const [isSendingWhatsApp, setIsSendingWhatsApp] = useState(false)
+  const [whatsAppMsg, setWhatsAppMsg] = useState<{ type: "success" | "error"; text: string } | null>(null)
+  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null)
+  const [isLoadingPdf, setIsLoadingPdf] = useState(true)
+  const [pdfError, setPdfError] = useState<string | null>(null)
+  const [reloadKey, setReloadKey] = useState(0)
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
+
+  const rawPdfUrl = prescriptionId ? getPrescriptionPdfUrl(prescriptionId) : ""
+
+  // Fetch prescription PDF with Bearer Token into an authenticated Blob URL
+  useEffect(() => {
+    let active = true
+    let currentBlobUrl: string | null = null
+
+    if (!prescriptionId) {
+      setIsLoadingPdf(false)
+      return
+    }
+
+    setIsLoadingPdf(true)
+    setPdfError(null)
+
+    getValidAccessToken()
+      .then(token => {
+        return fetch(rawPdfUrl, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        })
+      })
+      .then(async res => {
+        if (!res.ok) {
+          const errJson = await res.json().catch(() => ({}))
+          throw new Error(errJson.detail || errJson.error || `HTTP ${res.status}: Failed to generate/load PDF.`)
+        }
+        return res.blob()
+      })
+      .then(blob => {
+        if (!active) return
+        currentBlobUrl = URL.createObjectURL(blob)
+        setPdfBlobUrl(currentBlobUrl)
+        setIsLoadingPdf(false)
+      })
+      .catch(err => {
+        if (!active) return
+        console.error("Prescription PDF fetch error:", err)
+        setPdfError(err.message || "Failed to load prescription document.")
+        setIsLoadingPdf(false)
+      })
+
+    return () => {
+      active = false
+      if (currentBlobUrl) {
+        URL.revokeObjectURL(currentBlobUrl)
+      }
+    }
+  }, [prescriptionId, rawPdfUrl, reloadKey])
+
+  const handleSendWhatsApp = async () => {
+    if (!prescriptionId) {
+      setWhatsAppMsg({ type: "error", text: "No prescription ID found to dispatch." })
+      return
+    }
+
+    setIsSendingWhatsApp(true)
+    setWhatsAppMsg(null)
+
+    try {
+      const res = await sendPrescriptionWhatsApp(prescriptionId)
+      setIsSendingWhatsApp(false)
+      if (res.ok) {
+        setWhatsAppMsg({ type: "success", text: "Prescription PDF dispatched to patient's WhatsApp successfully!" })
+      } else {
+        setWhatsAppMsg({ type: "error", text: res.error || "Failed to dispatch WhatsApp message." })
+      }
+    } catch (err: any) {
+      setIsSendingWhatsApp(false)
+      setWhatsAppMsg({ type: "error", text: err.message || "Error sending WhatsApp message." })
+    }
+  }
+
+  const handleDownloadPdf = () => {
+    if (pdfBlobUrl) {
+      const a = document.createElement("a")
+      a.href = pdfBlobUrl
+      a.download = `Prescription_${patientName.replace(/\s+/g, "_")}_${prescriptionId}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+    } else if (rawPdfUrl) {
+      window.open(rawPdfUrl, "_blank")
+    }
+  }
+
+  const handleOpenNewTab = () => {
+    if (pdfBlobUrl) {
+      window.open(pdfBlobUrl, "_blank")
+    }
+  }
+
   return (
-    <div className="fixed inset-0 z-50 flex">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-5xl mx-auto my-6 bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col sm:flex-row">
-        {/* Dark sidebar */}
-        <div className="w-full sm:w-64 bg-slate-900 text-white p-6 flex flex-col gap-6 flex-shrink-0">
-          <div>
-            <div className="flex items-center gap-2 mb-6">
-              <div className="w-8 h-8 rounded-lg bg-teal-500 flex items-center justify-center">
-                <HeartPulseIcon />
-              </div>
-              <span className="font-800 text-teal-400 text-lg">RheumaLink</span>
-            </div>
-            <p className="text-slate-400 text-xs font-700 uppercase tracking-wide mb-1">Patient</p>
-            <p className="font-800 text-white text-base">Alpa Jaiswar</p>
-            <p className="text-slate-400 text-sm font-600 mt-1">RL-26-00011</p>
-          </div>
-          <div>
-            <p className="text-slate-400 text-xs font-700 uppercase tracking-wide mb-1">Doctor</p>
-            <p className="font-700 text-white">Dr. Shweta Gupta</p>
-          </div>
-          <div>
-            <p className="text-slate-400 text-xs font-700 uppercase tracking-wide mb-1">Date</p>
-            <p className="font-700 text-white">09 Aug 2026</p>
-          </div>
-          <div className="mt-auto space-y-3">
-            <button className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-700 rounded-xl transition-colors text-sm">
-              <span>📱</span> Send via WhatsApp
-            </button>
-            <button className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-sky-500 hover:bg-sky-600 text-white font-700 rounded-xl transition-colors text-sm">
-              <span>📄</span> Download PDF
-            </button>
-          </div>
-        </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
-        {/* PDF preview */}
-        <div className="flex-1 p-6 overflow-y-auto">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-800 text-slate-800 text-lg">Prescription Preview</h3>
-            <button onClick={onClose} className="p-2 rounded-xl hover:bg-slate-100 text-slate-500">
-              <CloseIcon />
-            </button>
-          </div>
-          <div className="border-2 border-slate-200 rounded-xl p-6 bg-slate-50 space-y-5">
-            {/* Header */}
-            <div className="border-b-2 border-teal-200 pb-4 flex items-start justify-between">
-              <div>
-                <h4 className="font-800 text-teal-700 text-xl">RheumaLink Clinic</h4>
-                <p className="text-slate-500 text-sm font-600">Dr. Shweta Gupta — Rheumatologist</p>
-                <p className="text-slate-400 text-xs font-500 mt-0.5">Mumbai, Maharashtra · +91 98000 00001</p>
-              </div>
-              <div className="text-right">
-                <p className="text-xs text-slate-500 font-700">Rx</p>
-                <p className="font-700 text-slate-600 text-sm">09/08/2026</p>
-              </div>
-            </div>
-
-            {/* Patient */}
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <p className="text-slate-400 font-700 text-xs uppercase tracking-wide">Patient</p>
-                <p className="font-800 text-slate-800">Alpa Jaiswar</p>
-                <p className="text-slate-500 font-600">File: RL-26-00011</p>
-              </div>
-              <div>
-                <p className="text-slate-400 font-700 text-xs uppercase tracking-wide">Blood Group</p>
-                <p className="font-800 text-slate-800">B+</p>
-              </div>
-            </div>
-
-            {/* Diagnosis */}
-            <div>
-              <p className="font-800 text-slate-700 text-sm border-b border-slate-200 pb-1 mb-2">Diagnosis</p>
-              <p className="text-slate-700 text-sm font-600">Rheumatoid Arthritis — Moderate Activity (DAS28: 4.2)</p>
-            </div>
-
-            {/* Medications */}
-            <div>
-              <p className="font-800 text-slate-700 text-sm border-b border-slate-200 pb-1 mb-2">Medications</p>
-              {[
-                { med: "Tab. Methotrexate", dose: "15 mg", dur: "4 weeks", instr: "Once weekly, after food" },
-                { med: "Tab. Folic Acid", dose: "5 mg", dur: "4 weeks", instr: "Daily except MTX day" },
-                { med: "Tab. Hydroxychloroquine", dose: "200 mg", dur: "4 weeks", instr: "Twice daily with meals" },
-              ].map((m, i) => (
-                <div key={i} className="flex gap-3 py-2 border-b border-slate-100 text-sm">
-                  <span className="w-5 h-5 rounded-full bg-teal-600 text-white text-xs font-800 flex items-center justify-center flex-shrink-0 mt-0.5">{i + 1}</span>
+      <div className="relative w-full max-w-7xl w-[98vw] h-[94vh] max-h-[94vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col md:flex-row">
+        {/* Left Clinical details sidebar (collapsible for maximum PDF width) */}
+        <div
+          className={`${
+            isSidebarCollapsed ? "w-0 p-0 overflow-hidden md:w-16 md:p-3" : "w-full md:w-72 p-5"
+          } bg-slate-900 text-white flex flex-col justify-between flex-shrink-0 transition-all duration-200 z-10 border-r border-slate-800`}
+        >
+          {!isSidebarCollapsed ? (
+            <div className="space-y-4 overflow-y-auto">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-teal-500 flex items-center justify-center text-white shadow-sm">
+                    <HeartPulseIcon />
+                  </div>
                   <div>
-                    <p className="font-800 text-slate-800">{m.med} <span className="text-teal-600">{m.dose}</span></p>
-                    <p className="text-slate-500 font-600 text-xs">{m.dur} · {m.instr}</p>
+                    <span className="font-800 text-teal-400 text-base leading-tight block">RheumaLink</span>
+                    <span className="text-[9px] text-slate-400 font-600 uppercase tracking-wider block">Rx Generation Engine</span>
                   </div>
                 </div>
-              ))}
-            </div>
-
-            {/* Lab tests */}
-            <div>
-              <p className="font-800 text-slate-700 text-sm border-b border-slate-200 pb-1 mb-2">🧪 Lab Investigations</p>
-              <div className="flex flex-wrap gap-2">
-                {["CBC", "CRP", "ESR", "RF Quantitative"].map(t => (
-                  <span key={t} className="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-700 text-xs font-700 border border-blue-200">{t}</span>
-                ))}
+                <button
+                  onClick={() => setIsSidebarCollapsed(true)}
+                  title="Collapse sidebar for wide view"
+                  className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                >
+                  ◀
+                </button>
               </div>
+
+              <div className="bg-slate-800/80 rounded-xl p-3 border border-slate-700/60 space-y-2.5">
+                <div>
+                  <p className="text-slate-400 text-[10px] font-800 uppercase tracking-wider mb-0.5">Patient Details</p>
+                  <p className="font-800 text-white text-sm">{patientName}</p>
+                  {patientFile && <p className="text-teal-400 text-xs font-600 mt-0.5">📁 {patientFile}</p>}
+                </div>
+
+                <div className="border-t border-slate-700/60 pt-2">
+                  <p className="text-slate-400 text-[10px] font-800 uppercase tracking-wider mb-0.5">Consulting Doctor</p>
+                  <p className="font-700 text-slate-200 text-xs">{doctorName}</p>
+                </div>
+
+                <div className="border-t border-slate-700/60 pt-2">
+                  <p className="text-slate-400 text-[10px] font-800 uppercase tracking-wider mb-0.5">Consultation Date</p>
+                  <p className="font-700 text-slate-200 text-xs">{dateStr}</p>
+                </div>
+              </div>
+
+              {whatsAppMsg && (
+                <div
+                  className={`p-3 rounded-xl text-xs font-700 border ${
+                    whatsAppMsg.type === "success"
+                      ? "bg-emerald-950/70 border-emerald-500/50 text-emerald-300"
+                      : "bg-red-950/70 border-red-500/50 text-red-300"
+                  }`}
+                >
+                  {whatsAppMsg.type === "success" ? "✓ " : "⚠️ "}
+                  {whatsAppMsg.text}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-between h-full py-2">
+              <button
+                onClick={() => setIsSidebarCollapsed(false)}
+                title="Expand details sidebar"
+                className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-teal-400 hover:text-white transition-colors cursor-pointer"
+              >
+                ▶
+              </button>
+            </div>
+          )}
+
+          {!isSidebarCollapsed && (
+            <div className="pt-4 space-y-2">
+              <button
+                onClick={handleSendWhatsApp}
+                disabled={isSendingWhatsApp || !prescriptionId}
+                className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-500 active:scale-98 text-white font-700 rounded-xl transition-all text-xs shadow-md cursor-pointer disabled:opacity-50"
+              >
+                <span>📱</span>
+                {isSendingWhatsApp ? "Dispatching..." : "Send via WhatsApp"}
+              </button>
+
+              <button
+                onClick={handleDownloadPdf}
+                disabled={!pdfBlobUrl && !rawPdfUrl}
+                className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 bg-sky-600 hover:bg-sky-500 active:scale-98 text-white font-700 rounded-xl transition-all text-xs shadow-md cursor-pointer disabled:opacity-50"
+              >
+                <span>📄</span> Download PDF
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* PDF Viewer & Header Controls area */}
+        <div className="flex-1 p-3 sm:p-5 overflow-hidden flex flex-col bg-slate-100/80">
+          <div className="flex items-center justify-between mb-2.5 pb-2 border-b border-slate-200">
+            <div className="flex items-center gap-2.5">
+              {isSidebarCollapsed && (
+                <button
+                  onClick={() => setIsSidebarCollapsed(false)}
+                  className="px-2.5 py-1 rounded-lg bg-slate-800 text-teal-400 hover:bg-slate-700 text-xs font-700 cursor-pointer flex items-center gap-1"
+                >
+                  <span>📋</span> Details
+                </button>
+              )}
+              <h3 className="font-800 text-slate-800 text-base sm:text-lg flex items-center gap-2">
+                <span>Official Prescription Document</span>
+                {prescriptionId && (
+                  <span className="px-2.5 py-0.5 rounded-full bg-teal-100 text-teal-800 text-xs font-800">
+                    Rx #{prescriptionId}
+                  </span>
+                )}
+              </h3>
             </div>
 
-            {/* Follow-up */}
-            <div className="bg-teal-50 rounded-xl p-3 border border-teal-200">
-              <p className="text-xs font-700 text-teal-600 uppercase tracking-wide">📅 Follow-up</p>
-              <p className="font-800 text-slate-800 mt-0.5">In 1 Month — 09 September 2026</p>
-            </div>
+            {/* Quick Action Toolbar */}
+            <div className="flex items-center gap-2">
+              {pdfBlobUrl && (
+                <button
+                  onClick={handleOpenNewTab}
+                  title="Open in full tab"
+                  className="px-3 py-1.5 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-700 transition-colors cursor-pointer flex items-center gap-1.5"
+                >
+                  <span>↗</span> Full Tab
+                </button>
+              )}
 
-            <p className="text-slate-400 text-xs font-600 italic">This prescription is computer-generated and is valid without a physical signature.</p>
+              <button
+                onClick={onClose}
+                title="Close Viewer"
+                className="p-1.5 rounded-xl hover:bg-slate-200 text-slate-600 transition-colors cursor-pointer"
+              >
+                <CloseIcon />
+              </button>
+            </div>
+          </div>
+
+          {/* Full Width PDF Iframe with #navpanes=0&view=FitH */}
+          <div className="flex-1 w-full bg-white rounded-xl border border-slate-300 shadow-sm overflow-hidden flex flex-col items-center justify-center">
+            {isLoadingPdf ? (
+              <div className="flex flex-col items-center justify-center gap-3 p-8 text-center">
+                <div className="w-10 h-10 border-3 border-teal-500 border-t-transparent rounded-full animate-spin" />
+                <p className="text-slate-700 font-700 text-sm">Rendering official prescription PDF...</p>
+                <p className="text-slate-400 text-xs font-500">Converting clinical notes &amp; Rx with Gotenberg engine</p>
+              </div>
+            ) : pdfError ? (
+              <div className="flex flex-col items-center justify-center gap-3 p-8 text-center max-w-md">
+                <span className="text-3xl">⚠️</span>
+                <p className="text-red-600 font-700 text-sm">{pdfError}</p>
+                <button
+                  onClick={() => setReloadKey(k => k + 1)}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg text-xs font-700 cursor-pointer transition-all"
+                >
+                  🔄 Retry Rendering PDF
+                </button>
+              </div>
+            ) : pdfBlobUrl ? (
+              <iframe
+                src={`${pdfBlobUrl}#toolbar=1&navpanes=0&scrollbar=1&view=FitH`}
+                title="Prescription PDF Preview"
+                className="w-full h-full border-0"
+              />
+            ) : (
+              <div className="h-full flex items-center justify-center p-10 text-slate-400 font-600 text-sm italic">
+                Prescription PDF will be rendered once consultation is saved.
+              </div>
+            )}
           </div>
         </div>
       </div>

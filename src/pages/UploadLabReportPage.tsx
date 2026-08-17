@@ -79,29 +79,46 @@ export function UploadLabReportPage({ onBackToDashboard }: { onBackToDashboard: 
 
       const uploadRes = await uploadLabReportTemp(formData)
 
-      if (uploadRes.status === "success" && uploadRes.task_id) {
-        setReportId(uploadRes.report_id)
-        
+      if ((uploadRes.ok || uploadRes.status === "success") && uploadRes.task_id) {
+        if (uploadRes.report_id) setReportId(uploadRes.report_id)
+
         // Poll background Celery task
         const interval = setInterval(async () => {
-          const statusRes = await pollLabReportTask(uploadRes.task_id)
-          if (statusRes.state === "SUCCESS") {
-            clearInterval(interval)
-            setIsProcessing(false)
-            if (statusRes.result && statusRes.result.test_data) {
-              const rows: LabTestRow[] = statusRes.result.test_data.map((td: any, idx: number) => ({
-                id: String(idx + 1),
-                name: td.test_name || td.name || "",
-                value: td.value || "",
-                unit: td.unit || "",
-                ref: td.reference_range || td.ref || "",
-              }))
-              setTestRows(rows)
+          try {
+            const statusRes = await pollLabReportTask(uploadRes.task_id)
+            if (statusRes.status === "SUCCESS" || (statusRes as any).state === "SUCCESS") {
+              clearInterval(interval)
+              setIsProcessing(false)
+              const resObj = statusRes.result || {}
+              if (resObj.report_id) setReportId(resObj.report_id)
+
+              const extracted = resObj.data || resObj.test_data || resObj
+              if (extracted && typeof extracted === "object" && !Array.isArray(extracted)) {
+                const rows: LabTestRow[] = Object.entries(extracted).map(([testName, testInfo]: [string, any], idx) => ({
+                  id: String(idx + 1),
+                  name: testName,
+                  value: testInfo?.value || String(testInfo || ""),
+                  unit: testInfo?.unit || "",
+                  ref: testInfo?.reference_interval || testInfo?.ref || "",
+                }))
+                setTestRows(rows)
+              } else if (Array.isArray(extracted)) {
+                const rows: LabTestRow[] = extracted.map((td: any, idx: number) => ({
+                  id: String(idx + 1),
+                  name: td.test_name || td.name || "",
+                  value: td.value || td.result_value || "",
+                  unit: td.unit || "",
+                  ref: td.reference_interval || td.reference_range || td.ref || "",
+                }))
+                setTestRows(rows)
+              }
+            } else if (statusRes.status === "FAILURE" || (statusRes as any).state === "FAILURE") {
+              clearInterval(interval)
+              setIsProcessing(false)
+              setErrorMsg("AI extraction failed: " + (statusRes.error || "Processing error"))
             }
-          } else if (statusRes.state === "FAILURE") {
-            clearInterval(interval)
-            setIsProcessing(false)
-            setErrorMsg("AI extraction failed: " + (statusRes.error || "Processing error"))
+          } catch (pollErr: any) {
+            console.error("Polling error:", pollErr)
           }
         }, 2000)
       } else {
@@ -133,18 +150,29 @@ export function UploadLabReportPage({ onBackToDashboard }: { onBackToDashboard: 
       setTimeout(() => {
         setSaveSuccess(false)
         onBackToDashboard()
-      }, 2000)
+      }, 1500)
       return
     }
 
     try {
-      const res = await saveExtractedLabData(reportId, testRows)
-      if (res.status === "success") {
+      const formattedTestData: Record<string, any> = {}
+      testRows.forEach(r => {
+        if (r.name.trim()) {
+          formattedTestData[r.name.trim()] = {
+            value: r.value.trim(),
+            unit: r.unit.trim(),
+            reference_interval: r.ref?.trim() || undefined,
+          }
+        }
+      })
+
+      const res = await saveExtractedLabData(reportId, formattedTestData)
+      if (res.ok || (res as any).status === "success") {
         setSaveSuccess(true)
         setTimeout(() => {
           setSaveSuccess(false)
           onBackToDashboard()
-        }, 2000)
+        }, 1500)
       } else {
         setErrorMsg("Failed to save verified lab report.")
       }

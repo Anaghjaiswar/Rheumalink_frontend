@@ -10,6 +10,8 @@ import {
   UserPlusIcon, SearchIcon, UploadIcon, StethoscopeIcon, ClockIcon, CheckCircleIcon, CalendarIcon
 } from "../components/icons"
 import { fetchCompounderDashboard, updateAppointmentStatus } from "../services/api"
+import { useLiveQueueSync } from "../hooks/useLiveQueueSync"
+
 
 function TableSection({ title, count, children }: { title: string; count: number; children: React.ReactNode }) {
   return (
@@ -92,6 +94,13 @@ export function CompounderDeskPage({
       })
       .catch(() => setIsSearching(false))
   }
+
+  // Live Real-Time Queue Synchronization via WebSocket & Polling Fallback
+  const { isConnected: isLiveConnected } = useLiveQueueSync({
+    onQueueChange: () => {
+      loadDashboard(searchQuery)
+    },
+  })
 
   useEffect(() => {
     loadDashboard()
@@ -180,7 +189,13 @@ export function CompounderDeskPage({
         {/* ── PAGE HEADER ── */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-800 text-slate-800">📋 Compounder Desk</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl sm:text-3xl font-800 text-slate-800">📋 Compounder Desk</h1>
+              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-700 ${isLiveConnected ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-slate-100 text-slate-600 border border-slate-200"}`}>
+                <span className={`w-2 h-2 rounded-full ${isLiveConnected ? "bg-emerald-500 animate-pulse" : "bg-slate-400"}`} />
+                {isLiveConnected ? "🟢 Live Queue Synced" : "⚪ Polling Active"}
+              </span>
+            </div>
             <p className="text-slate-500 font-500 text-sm mt-0.5">Registration, Vitals, Medical History &amp; Queue Management</p>
           </div>
 

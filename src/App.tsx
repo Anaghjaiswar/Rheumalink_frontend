@@ -14,6 +14,8 @@ import {
   getStoredCompounderToken,
   clearCompounderAuthSession,
   decodeJwtClaims,
+  isTokenExpired,
+  refreshAuthToken,
   UserProfile,
 } from './services/auth'
 
@@ -91,6 +93,50 @@ export default function App() {
 
   const [doctorUser, setDoctorUser] = useState<UserProfile | null>(() => getStoredDoctorUser())
   const [compounderUser, setCompounderUser] = useState<UserProfile | null>(() => getStoredCompounderUser())
+
+  // Proactively validate and refresh authentication on application mount
+  useEffect(() => {
+    const validateAuthSession = async () => {
+      const docToken = getStoredDoctorToken()
+      const compToken = getStoredCompounderToken()
+
+      if (docToken && isTokenExpired(docToken)) {
+        const freshDocToken = await refreshAuthToken()
+        if (!freshDocToken) {
+          clearDoctorAuthSession()
+          setDoctorUser(null)
+          if (['/doctor-dashboard', '/joint-chart', '/upload-lab-report', '/rheumat-diagnosis'].includes(window.location.pathname)) {
+            navigateTo('/doctor/login')
+          }
+        }
+      }
+
+      if (compToken && isTokenExpired(compToken)) {
+        const freshCompToken = await refreshAuthToken()
+        if (!freshCompToken) {
+          clearCompounderAuthSession()
+          setCompounderUser(null)
+          if (window.location.pathname === '/compounder-dashboard') {
+            navigateTo('/compounder/login')
+          }
+        }
+      }
+    }
+
+    validateAuthSession()
+  }, [])
+
+  // Listen to global auth:logout events when tokens are unrefreshable
+  useEffect(() => {
+    const handleGlobalLogout = () => {
+      setDoctorUser(null)
+      setCompounderUser(null)
+      navigateTo('/')
+    }
+
+    window.addEventListener('auth:logout', handleGlobalLogout)
+    return () => window.removeEventListener('auth:logout', handleGlobalLogout)
+  }, [])
 
   // Listen to browser Back/Forward navigation
   useEffect(() => {

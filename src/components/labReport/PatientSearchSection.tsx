@@ -8,13 +8,14 @@ export function PatientSearchSection({
   selectedPatient,
   onSelectPatient,
   onResetPatient,
+  onClearPatient,
 }: {
   selectedPatient: PatientSearchResult | null
   onSelectPatient: (p: PatientSearchResult) => void
   onResetPatient?: () => void
   onClearPatient?: () => void
 }) {
-  const handleReset = onResetPatient || onClearPatient || (() => {})
+  const handleReset = onClearPatient || onResetPatient || (() => {})
   const [query, setQuery] = useState("")
   const [isOpen, setIsOpen] = useState(false)
   const [dbPatients, setDbPatients] = useState<PatientSearchResult[]>([])
@@ -27,10 +28,10 @@ export function PatientSearchSection({
             if (res.ok && res.search_results) {
               setDbPatients(res.search_results.map((p: any) => ({
                 id: String(p.id),
-                name: p.name,
-                internalFile: p.internal_file,
+                name: p.name || p.patient_name,
+                internalFile: p.internal_file || p.file || "-",
                 externalFile: p.external_file || "-",
-                phone: p.contact || "-",
+                phone: p.contact || p.phone || p.contact_no || "-",
               })))
             }
           })
@@ -41,6 +42,11 @@ export function PatientSearchSection({
       setDbPatients([])
     }
   }, [query])
+
+  const patientName = (selectedPatient as any)?.name || (selectedPatient as any)?.patient_name || "Unknown Patient"
+  const internalFile = (selectedPatient as any)?.internalFile || (selectedPatient as any)?.internal_file || (selectedPatient as any)?.file || "-"
+  const externalFile = (selectedPatient as any)?.externalFile || (selectedPatient as any)?.external_file || "-"
+  const phone = (selectedPatient as any)?.phone || (selectedPatient as any)?.contact || (selectedPatient as any)?.contact_no || "-"
 
   return (
     <div className="space-y-3">
@@ -92,19 +98,22 @@ export function PatientSearchSection({
         </div>
       ) : (
         /* Selected Patient Card */
-        <div className="bg-teal-50/80 border-2 border-teal-300 rounded-xl p-4 flex items-center justify-between">
+        <div className="bg-teal-50/80 border-2 border-teal-300 rounded-xl p-4 flex items-center justify-between flex-wrap gap-3">
           <div>
-            <h3 className="font-800 text-teal-800 text-base">{selectedPatient.name}</h3>
+            <h3 className="font-800 text-teal-800 text-base">{patientName}</h3>
             <p className="text-xs font-600 text-slate-600 mt-0.5">
-              Internal File: <span className="font-700">{selectedPatient.internalFile}</span> · Ext: {selectedPatient.externalFile} · {selectedPatient.phone}
+              Internal File: <span className="font-700 text-slate-800">{internalFile}</span> · Ext: {externalFile} · 📞 {phone}
             </p>
           </div>
           <button
             type="button"
-            onClick={handleReset}
-            className="px-3.5 py-2 bg-white hover:bg-slate-50 text-teal-700 font-700 text-xs border border-teal-300 rounded-lg transition-colors"
+            onClick={() => {
+              handleReset()
+              setIsOpen(true)
+            }}
+            className="px-3.5 py-2 bg-white hover:bg-slate-50 text-teal-700 font-700 text-xs border border-teal-300 rounded-lg transition-colors cursor-pointer shadow-xs"
           >
-            Change Patient
+            🔍 Change Patient
           </button>
         </div>
       )}

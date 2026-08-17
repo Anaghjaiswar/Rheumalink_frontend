@@ -9,6 +9,7 @@ import {
   UploadIcon, SearchIcon, ClockIcon, StethoscopeIcon, CheckCircleIcon, CalendarIcon
 } from "../components/icons"
 import { fetchDoctorDashboard, fetchCompounderDashboard } from "../services/api"
+import { useLiveQueueSync } from "../hooks/useLiveQueueSync"
 
 function SectionTitle({ icon, title }: { icon: string; title: string }) {
   return (
@@ -51,7 +52,7 @@ export function DoctorDeskPage({
   const [waitingList, setWaitingList] = useState<any[]>([])
   const [counts, setCounts] = useState({ waiting: 0, attending: 0, attended: 0, total_today: 0 })
 
-  useEffect(() => {
+  const loadDoctorDashboard = () => {
     fetchDoctorDashboard()
       .then(res => {
         if (res.ok) {
@@ -62,7 +63,19 @@ export function DoctorDeskPage({
         }
       })
       .catch(() => {})
+  }
+
+  // Live Real-Time Queue Synchronization via WebSocket & Polling Fallback
+  const { isConnected: isLiveConnected } = useLiveQueueSync({
+    onQueueChange: () => {
+      loadDoctorDashboard()
+    },
+  })
+
+  useEffect(() => {
+    loadDoctorDashboard()
   }, [])
+
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -117,7 +130,13 @@ export function DoctorDeskPage({
         {/* ── PAGE HEADER ── */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-800 text-slate-800">🩺 Doctor Desk</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl sm:text-3xl font-800 text-slate-800">🩺 Doctor Desk</h1>
+              <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-700 ${isLiveConnected ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-slate-100 text-slate-600 border border-slate-200"}`}>
+                <span className={`w-2 h-2 rounded-full ${isLiveConnected ? "bg-emerald-500 animate-pulse" : "bg-slate-400"}`} />
+                {isLiveConnected ? "🟢 Live Queue Synced" : "⚪ Polling Active"}
+              </span>
+            </div>
             <p className="text-slate-500 font-500 text-sm mt-0.5">Consultations, prescriptions, and patient management</p>
           </div>
           <button
@@ -235,6 +254,7 @@ export function DoctorDeskPage({
             attending={true}
             onOpenSummary={p => setSlideOverPatient(p)}
             onStartConsultation={p => handleStartConsultation(p)}
+            onStatusUpdated={loadDoctorDashboard}
           />
 
           <PatientTable
@@ -243,6 +263,7 @@ export function DoctorDeskPage({
             attending={false}
             onOpenSummary={p => setSlideOverPatient(p)}
             onStartConsultation={p => handleStartConsultation(p)}
+            onStatusUpdated={loadDoctorDashboard}
           />
         </div>
 
